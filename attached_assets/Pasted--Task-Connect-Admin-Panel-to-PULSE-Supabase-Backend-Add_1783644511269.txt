@@ -1,0 +1,86 @@
+
+# Task: Connect Admin Panel to PULSE Supabase Backend
+
+Add full admin management for **promotional banners**, **doctor license verification**, and **appointment payment proof review** in the PULSE mobile app. Connect to the **same Supabase project** the mobile app already uses (same `SUPABASE_URL` — do not create a new project). Use the **service role key** server-side in the admin panel's backend for all admin operations; never expose it to browser/client code.
+
+---
+
+## 1. Promotional Banners
+
+### Table: `public.banners`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key, auto-generated |
+| `title` | text | Required. Banner headline |
+| `message` | text | Required. Banner subtext |
+| `promoCode` | text | Optional. Shown as a "PROMO" badge on the banner |
+| `imageUrl` | text | Optional. Full public URL of the banner image. If empty, app shows a default fallback image |
+| `videoUrl` | text | Optional, reserved for future use |
+| `linkUrl` | text | Optional. If set, tapping the banner opens this URL |
+| `isActive` | boolean | Default `true`. Only banners with `isActive = true` are shown |
+| `type` | text | Default `'photo'` |
+| `displayDuration` | integer | Default `5` seconds per banner before auto-advance |
+| `priority` | integer | Default `0`. Higher priority shows first (sorted descending) |
+
+Build CRUD (list, create, edit, delete, toggle `isActive`) against this table.
+
+### Storage bucket: `banners`
+- **Public** bucket. Max file size 5MB. Allowed types: `image/png`, `image/jpeg`, `image/webp`, `image/gif`.
+- On image upload: PUT to `banners/<uuid>.<ext>`, then use the bucket's public URL for that path, save into the banner's `imageUrl` column.
+
+---
+
+## 2. Doctor License Verification
+
+### Table: `public.doctors`
+Relevant columns for this flow:
+- `userId` — links to the Supabase Auth user (doctor)
+- `licenseFile` — jsonb, shape `{ path, name, type }` pointing at the file in the `medical-licenses` bucket
+- Doctor's overall approval/verification status field (check existing columns in your schema for the approval flag used to activate their account)
+
+Build an admin screen that:
+1. Lists doctors pending verification (those with a `licenseFile` set but not yet approved).
+2. Lets admin view the uploaded license: fetch it from the `medical-licenses` bucket at path `licenseFile.path` using a **signed URL** (bucket is private — use `createSignedUrl`, not a public URL, since only the service role/admin should view these documents).
+3. Lets admin approve or reject the doctor, updating the relevant status column so the app unlocks their provider account.
+
+### Storage bucket: `medical-licenses`
+- **Private** bucket. Max file size 10MB. Allowed types: `image/png`, `image/jpeg`, `application/pdf`.
+- Files are stored at path `<doctorUserId>/license_<timestamp>_<filename>`.
+- Admin access: use the service role key to generate a signed URL (short expiry, e.g. 5–10 minutes) whenever a reviewer wants to view a document. Do not make this bucket public — these are sensitive identity/professional documents.
+
+---
+
+## 3. Appointment Payment Proof Review
+
+### Table: `public.appointments`
+Relevant columns (camelCase):
+- `paymentProofUrl` — public URL of the uploaded payment screenshot (in `payment-proofs` bucket)
+- `paymentStatus` — `pending` / `verified` / `rejected` (admin sets this after reviewing the proof)
+- `status` — booking status, e.g. `pending` / `scheduled` / `cancelled`
+- `patientName`, `doctorName`, `transactionId`, `senderName`, `paymentMethod`, `totalPrice` — shown to admin for manual verification against the payment proof image
+
+Build an admin screen that:
+1. Lists appointments with `paymentStatus = 'pending'`.
+2. Shows the payment proof image (`paymentProofUrl` is a public URL — just render it directly).
+3. Lets admin set `paymentStatus` to `verified` or `rejected`. Once `verified` (and `status = 'scheduled'`), the patient's video consultation screen automatically unlocks in real time (the app subscribes to changes on this row).
+
+### Storage bucket: `payment-proofs`
+- **Public** bucket (payment proof images need direct public display for admin review and are non-sensitive screenshots). Max file size 10MB. Allowed types: `image/png`, `image/jpeg`, `image/webp`.
+- Files are stored at path `payment_proofs/<userId>_<timestamp>.<ext>`.
+
+---
+
+## 4. Also present (lower priority, same pattern)
+
+- **`profile-images`** bucket — public, doctor/patient avatar photos, path `<userId>/avatar_<timestamp>.<ext>`.
+- **`radiology-scans`** bucket — private, radiology case scan images tied to `medicalRecords` table, path `<userId>/<timestamp>_scan.<ext>`. Same signed-URL access pattern as `medical-licenses`.
+
+---
+
+## Acceptance criteria
+
+- Uploading a banner image, doctor license, or payment proof from the mobile app is immediately visible and actionable in the admin panel — no app redeploy needed, everything reads live from Supabase.
+- Admin approving a doctor's license unlocks their provider account in the app.
+- Admin verifying a payment proof unlocks the patient's video consultation screen in real time.
+- Private buckets (`medical-licenses`, `radiology-scans`) are never exposed via public URLs — always use signed URLs generated server-side with the service role key.
