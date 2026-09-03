@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "p5uGvdpNQ1Fo2dzKAd4h7"
+uri = "file://docs/ADMIN_DATA_SOURCES.md"
+type = "text"
+title = "Pulse Network Admin Data Sources"
+description = "Complete map of admin data flows, Supabase tables, API endpoints, derived patient data, audit writes, and storage buckets."
+logical_id = "7fe2444c-8704-4c34-b268-6a5d53040516"
+content_hash = "sha256:a569e2cca502bd8e240974ea719a0954f684cd46c3003a5a37e0cecd649ccebf"
+size = 17556
+mtime_ms = 1788461608242
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:5185ee3e-002f-4af3-9d17-0d481507dec5/7fe2444c-8704-4c34-b268-6a5d53040516/38531576-e1e7-4211-be1e-60f5ce7ab025"
+storage_version_token = "1788461626114346"
+content_type = "text/markdown"
