@@ -73,12 +73,12 @@ export default function DashboardScreen() {
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <View style={styles.row}>
-          <StatCard label="Active Providers" value={stats.active} color="#10b981" trend="up" trendValue={`${stats.total} total`} onPress={() => router.push("/(tabs)/providers")} />
-          <StatCard label="Pending Review" value={stats.pending} color="#f59e0b" onPress={() => router.push("/license-review")} />
+          <StatCard testID="dashboard-stat-active-providers" label="Active Providers" value={stats.active} color="#10b981" trend="up" trendValue={`${stats.total} total`} onPress={() => router.push("/(tabs)/providers")} />
+          <StatCard testID="dashboard-stat-pending-review" label="Pending Review" value={stats.pending} color="#f59e0b" onPress={() => router.push("/license-review")} />
         </View>
         <View style={styles.row}>
-          <StatCard label="Completed Appts" value={stats.completed} color="#818cf8" onPress={() => router.push("/(tabs)/appointments")} />
-          <StatCard label="Platform Revenue" value={`AED ${stats.platformRevenue.toLocaleString()}`} color="#6366f1" onPress={() => router.push("/(tabs)/revenue")} />
+          <StatCard testID="dashboard-stat-completed-appointments" label="Completed Appts" value={stats.completed} color="#818cf8" onPress={() => router.push("/(tabs)/appointments")} />
+          <StatCard testID="dashboard-stat-platform-revenue" label="Platform Revenue" value={`AED ${stats.platformRevenue.toLocaleString()}`} color="#6366f1" onPress={() => router.push("/(tabs)/revenue")} />
         </View>
       </View>
 

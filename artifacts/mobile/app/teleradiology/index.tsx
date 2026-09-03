@@ -107,6 +107,10 @@ export default function TeleradiologyScreen() {
           onPress: async () => {
             try {
               await updateCaseStatus(actionTarget!.id, status);
+              setNotice({
+                title: "Updated",
+                message: `Case status set to ${STATUS_META[status].label.toLowerCase()}.`,
+              });
             } catch (error: any) {
               setNotice({ title: "Update Failed", message: error?.message ?? "Could not update case." });
             }
@@ -148,7 +152,7 @@ function CaseCard({ tc, colors, onAction }: { tc: TeleradiologyCase; colors: any
             <Feather name={m.icon} size={9} color={m.color} />
             <Text style={[cardStyles.statusText, { color: m.color }]}>{m.label}</Text>
           </View>
-          <Pressable onPress={onAction} style={[cardStyles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+          <Pressable testID={`teleradiology-status-menu-${tc.id}`} accessibilityRole="button" accessibilityLabel={`Change status for ${tc.caseId}`} onPress={onAction} style={[cardStyles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
             <Feather name="more-horizontal" size={14} color={colors.mutedForeground} />
           </Pressable>
         </View>

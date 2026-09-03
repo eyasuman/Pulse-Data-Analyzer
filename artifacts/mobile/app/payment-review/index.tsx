@@ -61,6 +61,10 @@ export default function PaymentReviewScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await updatePaymentStatus(appointment.id, status);
+      setNotice({
+        title: status === "verified" ? "Payment Verified" : "Payment Rejected",
+        message: `Payment for ${appointment.patientName} has been ${status === "verified" ? "verified" : "rejected"}.`,
+      });
     } catch (err: any) {
       setNotice({ title: "Error", message: err?.message ?? "Update failed." });
     } finally {
@@ -317,11 +321,11 @@ function PaymentCard({
 
         {isPending && (
           <>
-            <Pressable onPress={onReject} disabled={isLoading} style={({ pressed }) => [pcStyles.actionBtn, { backgroundColor: "#ef444415", borderColor: "#ef444430", opacity: pressed || isLoading ? 0.7 : 1 }]}>
+            <Pressable testID={`payment-reject-${appointment.id}`} accessibilityLabel="Reject payment" onPress={onReject} disabled={isLoading} style={({ pressed }) => [pcStyles.actionBtn, { backgroundColor: "#ef444415", borderColor: "#ef444430", opacity: pressed || isLoading ? 0.7 : 1 }]}>
               {isLoading ? <ActivityIndicator size={12} color="#ef4444" /> : <Feather name="x" size={13} color="#ef4444" />}
               <Text style={[pcStyles.actionText, { color: "#ef4444" }]}>Reject</Text>
             </Pressable>
-            <Pressable onPress={onVerify} disabled={isLoading} style={({ pressed }) => [pcStyles.actionBtn, { backgroundColor: "#10b98115", borderColor: "#10b98130", opacity: pressed || isLoading ? 0.7 : 1, flex: 2 }]}>
+            <Pressable testID={`payment-verify-${appointment.id}`} accessibilityLabel="Verify payment" onPress={onVerify} disabled={isLoading} style={({ pressed }) => [pcStyles.actionBtn, { backgroundColor: "#10b98115", borderColor: "#10b98130", opacity: pressed || isLoading ? 0.7 : 1, flex: 2 }]}>
               {isLoading ? <ActivityIndicator size={12} color="#10b981" /> : <Feather name="check" size={13} color="#10b981" />}
               <Text style={[pcStyles.actionText, { color: "#10b981" }]}>Verify</Text>
             </Pressable>

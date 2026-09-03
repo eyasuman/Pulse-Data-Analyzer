@@ -222,6 +222,8 @@ function LicenseCard({
       {/* Action buttons */}
       <View style={[cardStyles.actions, { borderTopColor: colors.border }]}>
         <Pressable
+            testID={`license-reject-${doctor.id}`}
+            accessibilityLabel="Reject license"
           onPress={onReject}
           disabled={isLoading}
           style={({ pressed }) => [
@@ -239,6 +241,8 @@ function LicenseCard({
           )}
         </Pressable>
         <Pressable
+          testID={`license-approve-${doctor.id}`}
+          accessibilityLabel="Approve license"
           onPress={onApprove}
           disabled={isLoading}
           style={({ pressed }) => [

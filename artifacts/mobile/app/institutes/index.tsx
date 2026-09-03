@@ -222,7 +222,7 @@ function InstituteCard({ institute, colors, disabled, onOpenStatusMenu }: { inst
           <View style={[cardStyles.statusBadge, { backgroundColor: statusColor + "15", borderColor: statusColor + "30" }]}>
             <Text style={[cardStyles.statusText, { color: statusColor }]}>{institute.status.toUpperCase()}</Text>
           </View>
-          <Pressable accessibilityRole="button" disabled={disabled} onPress={onOpenStatusMenu} style={{ opacity: disabled ? 0.5 : 1 }}>
+            <Pressable testID={`institute-status-menu-${institute.id}`} accessibilityRole="button" accessibilityLabel={`Change status for ${institute.name}`} disabled={disabled} onPress={onOpenStatusMenu} style={{ opacity: disabled ? 0.5 : 1 }}>
             <Feather name="more-horizontal" size={14} color={colors.mutedForeground} />
           </Pressable>
         </View>

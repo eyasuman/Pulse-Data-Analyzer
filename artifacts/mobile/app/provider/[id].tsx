@@ -149,6 +149,8 @@ export default function ProviderDetailScreen() {
           {STATUS_ACTIONS.filter((a) => a.status !== doctor.status).map((action) => (
             <Pressable
               key={action.status}
+              testID={`provider-status-${action.status.toLowerCase()}`}
+              accessibilityLabel={action.label}
               onPress={() => handleStatusChange(action.status)}
               disabled={isUpdating}
               style={({ pressed }) => [

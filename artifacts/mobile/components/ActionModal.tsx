@@ -47,7 +47,7 @@ export function ActionModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View testID="action-modal" style={styles.card}>
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
           <View style={styles.options}>
@@ -56,7 +56,9 @@ export function ActionModal({
               return (
                 <Pressable
                   key={option.label}
+                  testID={`action-modal-option-${option.label.toLowerCase().replace(/\s+/g, "-")}`}
                   accessibilityRole="button"
+                  accessibilityLabel={option.label}
                   accessibilityState={{ disabled: !!busyLabel }}
                   disabled={!!busyLabel}
                   onPress={() => void runOption(option)}
@@ -75,7 +77,9 @@ export function ActionModal({
               );
             })}
             <Pressable
+              testID="action-modal-cancel"
               accessibilityRole="button"
+              accessibilityLabel={cancelLabel}
               disabled={!!busyLabel}
               onPress={onClose}
               style={({ pressed }) => [styles.cancel, { opacity: pressed || !!busyLabel ? 0.7 : 1 }]}

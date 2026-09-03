@@ -115,6 +115,10 @@ export default function ReviewsScreen() {
           onPress: async () => {
             try {
               await updateReviewStatus(actionTarget!.id, status);
+              setNotice({
+                title: "Updated",
+                message: `Review status set to ${STATUS_META[status].label.toLowerCase()}.`,
+              });
             } catch (error: any) {
               setNotice({ title: "Update Failed", message: error?.message ?? "Could not update review." });
             }
@@ -150,7 +154,7 @@ function ReviewCard({ review, colors, onAction }: { review: Review; colors: any;
             <Feather name={m.icon} size={9} color={m.color} />
             <Text style={[cardStyles.statusText, { color: m.color }]}>{m.label}</Text>
           </View>
-          <Pressable onPress={onAction} style={[cardStyles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+          <Pressable testID={`review-status-menu-${review.id}`} accessibilityRole="button" accessibilityLabel={`Change status for review by ${review.patientName}`} onPress={onAction} style={[cardStyles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
             <Feather name="more-horizontal" size={14} color={colors.mutedForeground} />
           </Pressable>
         </View>

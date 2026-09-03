@@ -10,9 +10,10 @@ interface StatCardProps {
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
   onPress?: () => void;
+  testID?: string;
 }
 
-export function StatCard({ label, value, subLabel, color, trend, trendValue, onPress }: StatCardProps) {
+export function StatCard({ label, value, subLabel, color, trend, trendValue, onPress, testID }: StatCardProps) {
   const colors = useColors();
   const accentColor = color || colors.primary;
 
@@ -63,7 +64,9 @@ export function StatCard({ label, value, subLabel, color, trend, trendValue, onP
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,

@@ -126,6 +126,7 @@ export default function BannersScreen() {
     setBusyId(banner.id);
     try {
       await deleteBanner(banner.id);
+      setNotice({ title: "Deleted", message: `"${banner.title}" has been deleted.` });
     } catch (error: any) {
       setNotice({ title: "Delete Failed", message: error?.message ?? "Could not delete banner." });
     } finally {
@@ -360,7 +361,7 @@ function BannerCard({ banner, colors, disabled, onToggle, onDelete }: { banner: 
             </View>
           ) : null}
         </View>
-        <Pressable onPress={onDelete} disabled={disabled} style={[cardStyles.deleteBtn, { borderColor: "#ef444430", opacity: disabled ? 0.5 : 1 }]}>
+        <Pressable testID={`banner-delete-${banner.id}`} accessibilityRole="button" accessibilityLabel={`Delete banner ${banner.title}`} onPress={onDelete} disabled={disabled} style={[cardStyles.deleteBtn, { borderColor: "#ef444430", opacity: disabled ? 0.5 : 1 }]}>
           <Feather name="trash-2" size={12} color="#ef4444" />
         </Pressable>
       </View>
