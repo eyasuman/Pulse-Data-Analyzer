@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, Platform,
   Modal, ScrollView, TextInput, Switch, KeyboardAvoidingView, Image,
   ActivityIndicator,
 } from "react-native";
@@ -10,6 +10,7 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
 import { useData, Banner } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 const TYPE_META: Record<string, { color: string; icon: any; label: string }> = {
   photo: { color: "#818cf8", icon: "image", label: "Photo" },
@@ -49,6 +50,8 @@ export default function BannersScreen() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const filtered = banners
     .filter((b) => activeFilter === "active" ? b.isActive : activeFilter === "inactive" ? !b.isActive : true);
@@ -58,7 +61,7 @@ export default function BannersScreen() {
 
   const handlePickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission Required", "Allow photo access to upload banner images."); return; }
+    if (!perm.granted) { setNotice({ title: "Permission Required", message: "Allow photo access to upload banner images." }); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
       base64: true,
@@ -71,20 +74,20 @@ export default function BannersScreen() {
     const mimeType = asset.mimeType ?? "image/jpeg";
     const ext = mimeType.split("/")[1] ?? "jpg";
     const b64 = asset.base64;
-    if (!b64) { Alert.alert("Error", "Could not read image data."); return; }
+    if (!b64) { setNotice({ title: "Error", message: "Could not read image data." }); return; }
     setUploading(true);
     try {
       const imageUrl = await uploadBannerImage(b64, mimeType, ext);
       setForm((f) => ({ ...f, imageUrl }));
     } catch (err: any) {
-      Alert.alert("Upload Failed", err?.message ?? "Could not upload image.");
+      setNotice({ title: "Upload Failed", message: err?.message ?? "Could not upload image." });
     } finally {
       setUploading(false);
     }
   };
 
   const handleAdd = async () => {
-    if (!form.title.trim() || !form.message.trim()) { Alert.alert("Required", "Title and message are required."); return; }
+    if (!form.title.trim() || !form.message.trim()) { setNotice({ title: "Required", message: "Title and message are required." }); return; }
     setSaving(true);
     try {
       await addBanner({
@@ -102,7 +105,7 @@ export default function BannersScreen() {
       setShowAddModal(false);
       setForm(DEFAULT_FORM);
     } catch (err: any) {
-      Alert.alert("Error", err?.message ?? "Failed to add banner.");
+      setNotice({ title: "Error", message: err?.message ?? "Failed to add banner." });
     } finally {
       setSaving(false);
     }
@@ -113,7 +116,7 @@ export default function BannersScreen() {
     try {
       await toggleBanner(banner.id);
     } catch (error: any) {
-      Alert.alert("Update Failed", error?.message ?? "Could not change banner status.");
+      setNotice({ title: "Update Failed", message: error?.message ?? "Could not change banner status." });
     } finally {
       setBusyId(null);
     }
@@ -124,7 +127,7 @@ export default function BannersScreen() {
     try {
       await deleteBanner(banner.id);
     } catch (error: any) {
-      Alert.alert("Delete Failed", error?.message ?? "Could not delete banner.");
+      setNotice({ title: "Delete Failed", message: error?.message ?? "Could not delete banner." });
     } finally {
       setBusyId(null);
     }
@@ -170,10 +173,7 @@ export default function BannersScreen() {
             colors={colors}
             disabled={busyId === item.id}
             onToggle={() => handleToggle(item)}
-            onDelete={() => Alert.alert("Delete Banner", `Delete "${item.title}"?`, [
-              { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: () => handleDelete(item) },
-            ])}
+             onDelete={() => setDeleteTarget(item)}
           />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
@@ -188,6 +188,20 @@ export default function BannersScreen() {
             </Pressable>
           </View>
         }
+      />
+
+      <ActionModal
+        visible={!!deleteTarget}
+        title="Delete Banner"
+        message={deleteTarget ? `Delete "${deleteTarget.title}"? This cannot be undone.` : undefined}
+        options={deleteTarget ? [{ label: "Delete", destructive: true, onPress: () => handleDelete(deleteTarget) }] : []}
+        onClose={() => setDeleteTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
 
       {/* Add Banner Modal */}

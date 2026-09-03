@@ -16,15 +16,8 @@ export function StatCard({ label, value, subLabel, color, trend, trendValue, onP
   const colors = useColors();
   const accentColor = color || colors.primary;
 
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        pressed && onPress ? { opacity: 0.85 } : undefined,
-      ]}
-    >
+  const content = (
+    <>
       <View style={[styles.dot, { backgroundColor: accentColor + "22", borderColor: accentColor + "44" }]}>
         <View style={[styles.dotInner, { backgroundColor: accentColor }]} />
       </View>
@@ -61,6 +54,24 @@ export function StatCard({ label, value, subLabel, color, trend, trendValue, onP
           </Text>
         </View>
       ) : null}
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        pressed ? { opacity: 0.85 } : undefined,
+      ]}
+    >
+      {content}
     </Pressable>
   );
 }
