@@ -53,7 +53,7 @@ export default function InstitutesScreen() {
     if (!form.name.trim() || !form.city.trim()) { Alert.alert("Required", "Name and city are required."); return; }
     setSaving(true);
     try {
-      await addInstitute({ ...form, status: "Pending", totalDoctors: 0, services: [], createdAt: new Date().toISOString() });
+      await addInstitute({ ...form, status: "Pending", totalDoctors: 0, services: [] });
       setShowAddModal(false);
       setForm({ name: "", type: "Hospital", city: "", address: "", phone: "", email: "", licenseNo: "" });
     } catch { Alert.alert("Error", "Failed to add institute."); }
@@ -119,12 +119,12 @@ export default function InstitutesScreen() {
                 </Pressable>
               </View>
 
-              <FieldInput label="Name *" value={form.name} onChangeText={(v) => setForm(f => ({ ...f, name: v }))} placeholder="Institute name" colors={colors} />
-              <FieldInput label="City *" value={form.city} onChangeText={(v) => setForm(f => ({ ...f, city: v }))} placeholder="City" colors={colors} />
-              <FieldInput label="Address" value={form.address} onChangeText={(v) => setForm(f => ({ ...f, address: v }))} placeholder="Full address" colors={colors} />
-              <FieldInput label="Phone" value={form.phone} onChangeText={(v) => setForm(f => ({ ...f, phone: v }))} placeholder="+971..." colors={colors} keyboardType="phone-pad" />
-              <FieldInput label="Email" value={form.email} onChangeText={(v) => setForm(f => ({ ...f, email: v }))} placeholder="contact@..." colors={colors} keyboardType="email-address" />
-              <FieldInput label="License No." value={form.licenseNo} onChangeText={(v) => setForm(f => ({ ...f, licenseNo: v }))} placeholder="LIC-..." colors={colors} />
+              <FieldInput label="Name *" value={form.name} onChangeText={(v: string) => setForm(f => ({ ...f, name: v }))} placeholder="Institute name" colors={colors} />
+              <FieldInput label="City *" value={form.city} onChangeText={(v: string) => setForm(f => ({ ...f, city: v }))} placeholder="City" colors={colors} />
+              <FieldInput label="Address" value={form.address} onChangeText={(v: string) => setForm(f => ({ ...f, address: v }))} placeholder="Full address" colors={colors} />
+              <FieldInput label="Phone" value={form.phone} onChangeText={(v: string) => setForm(f => ({ ...f, phone: v }))} placeholder="+971..." colors={colors} keyboardType="phone-pad" />
+              <FieldInput label="Email" value={form.email} onChangeText={(v: string) => setForm(f => ({ ...f, email: v }))} placeholder="contact@..." colors={colors} keyboardType="email-address" />
+              <FieldInput label="License No." value={form.licenseNo} onChangeText={(v: string) => setForm(f => ({ ...f, licenseNo: v }))} placeholder="LIC-..." colors={colors} />
 
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>TYPE</Text>
               <View style={styles.typeGrid}>

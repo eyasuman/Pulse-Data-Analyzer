@@ -5,6 +5,5 @@ import colors from "@/constants/colors";
  * Includes all design tokens plus `radius`.
  */
 export function useColors() {
-  const palette = (colors as Record<string, typeof colors.light>).dark ?? colors.light;
-  return { ...palette, radius: colors.radius };
+  return { ...colors.dark, radius: colors.radius };
 }

@@ -1,0 +1,1 @@
+- [Nested Expo EAS builds](nested-expo-eas-builds.md) — launch EAS from the mobile artifact; root launch uploads the non-Expo workspace and fails during dependency install.

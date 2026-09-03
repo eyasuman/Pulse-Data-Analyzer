@@ -124,7 +124,7 @@ export default function SettingsScreen() {
 
       {/* Inactivity Timeout */}
       <SettingSection title="Security" icon="shield" colors={colors}>
-        <FieldRow label="Inactivity Timeout" desc="Minutes before auto-lock" value={String(timeoutMinutes)} onChangeText={(v) => setTimeoutMinutes(parseInt(v) || 5)} unit="min" colors={colors} />
+        <FieldRow label="Inactivity Timeout" desc="Minutes before auto-lock" value={String(timeoutMinutes)} onChangeText={(v: string) => setTimeoutMinutes(parseInt(v) || 5)} unit="min" colors={colors} />
       </SettingSection>
 
       {/* Feature Toggles */}

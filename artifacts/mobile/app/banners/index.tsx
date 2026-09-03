@@ -178,10 +178,10 @@ export default function BannersScreen() {
                 </Pressable>
               </View>
 
-              <ModalField label="Title *" value={form.title} onChangeText={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Banner headline" colors={colors} />
-              <ModalField label="Message *" value={form.message} onChangeText={(v) => setForm(f => ({ ...f, message: v }))} placeholder="Banner subtext" colors={colors} multiline />
-              <ModalField label="Promo Code" value={form.promoCode} onChangeText={(v) => setForm(f => ({ ...f, promoCode: v }))} placeholder="Optional — shown as PROMO badge" colors={colors} />
-              <ModalField label="Link URL" value={form.linkUrl} onChangeText={(v) => setForm(f => ({ ...f, linkUrl: v }))} placeholder="https://... (opens on tap)" colors={colors} keyboardType="url" />
+              <ModalField label="Title *" value={form.title} onChangeText={(v: string) => setForm(f => ({ ...f, title: v }))} placeholder="Banner headline" colors={colors} />
+              <ModalField label="Message *" value={form.message} onChangeText={(v: string) => setForm(f => ({ ...f, message: v }))} placeholder="Banner subtext" colors={colors} multiline />
+              <ModalField label="Promo Code" value={form.promoCode} onChangeText={(v: string) => setForm(f => ({ ...f, promoCode: v }))} placeholder="Optional — shown as PROMO badge" colors={colors} />
+              <ModalField label="Link URL" value={form.linkUrl} onChangeText={(v: string) => setForm(f => ({ ...f, linkUrl: v }))} placeholder="https://... (opens on tap)" colors={colors} keyboardType="url" />
 
               {/* Image upload */}
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>BANNER IMAGE</Text>

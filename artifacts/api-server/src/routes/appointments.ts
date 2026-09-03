@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { sbSelect, sbUpdate } from "../lib/supabase";
+import { sbPublicUrl, sbSelect, sbUpdate } from "../lib/supabase";
 import { writeAudit } from "../lib/audit";
 
 const router = Router();
@@ -72,6 +72,10 @@ function normalizeAppointment(row: any) {
   const platformFeePercent = parseFloat(process.env["PLATFORM_FEE_PERCENT"] ?? "10") / 100;
   const platformFee = row.platformFee ?? row.platform_fee ?? Math.round(consultationFee * platformFeePercent);
   const totalPrice = row.totalPrice ?? row.total_price ?? consultationFee + platformFee;
+  const storedPaymentProofUrl = row.paymentProofUrl ?? row.payment_proof_url ?? null;
+  const paymentProofUrl = storedPaymentProofUrl && !storedPaymentProofUrl.startsWith("http")
+    ? sbPublicUrl("payment-proofs", storedPaymentProofUrl)
+    : storedPaymentProofUrl;
 
   return {
     id: row.id,
@@ -86,8 +90,8 @@ function normalizeAppointment(row: any) {
     serviceType: row.serviceType ?? row.service_type ?? "In-Person Visit",
     // Payment proof fields — treat null status as 'pending' when proof exists
     paymentStatus: (row.paymentStatus ?? row.payment_status) ||
-      ((row.paymentProofUrl ?? row.payment_proof_url) ? "pending" : null),
-    paymentProofUrl: row.paymentProofUrl ?? row.payment_proof_url ?? null,
+      (paymentProofUrl ? "pending" : null),
+    paymentProofUrl,
     transactionId: row.transactionId ?? row.transaction_id ?? null,
     senderName: row.senderName ?? row.sender_name ?? null,
     paymentMethod: row.paymentMethod ?? row.payment_method ?? null,

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Pulse Network",
-    "slug": "mobile",
+    "slug": "workspace",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.the_god_of_monarch.workspace"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

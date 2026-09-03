@@ -176,6 +176,15 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json();
 }
 
+async function safeApiFetch<T>(path: string, fallback: T): Promise<T> {
+  try {
+    return await apiFetch<T>(path);
+  } catch (error) {
+    console.warn(`Optional API resource ${path} is unavailable:`, error);
+    return fallback;
+  }
+}
+
 // ─── Context value ────────────────────────────────────────────────────────────
 
 interface DataContextValue {
@@ -254,36 +263,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const [
-        doctorsData, appointmentsData, revenueData, institutesData,
-        bannersData, reviewsData, patientsData, auditData, teleData, settingsData,
-      ] = await Promise.all([
-        apiFetch<Doctor[]>("/providers"),
-        apiFetch<Appointment[]>("/appointments"),
-        apiFetch<RevenueEntry[]>("/revenue"),
-        apiFetch<Institute[]>("/institutes"),
-        apiFetch<Banner[]>("/banners"),
-        apiFetch<Review[]>("/reviews"),
-        apiFetch<Patient[]>("/patients"),
-        apiFetch<AuditLog[]>("/audit"),
-        apiFetch<TeleradiologyCase[]>("/teleradiology"),
-        apiFetch<PlatformSettings>("/settings"),
-      ]);
-      setDoctors(doctorsData);
-      setAppointments(appointmentsData);
-      setRevenue(revenueData);
-      setInstitutes(institutesData);
-      setBanners(bannersData);
-      setReviews(reviewsData);
-      setPatients(patientsData);
-      setAuditLogs(auditData);
-      setTeleradiologyCases(teleData);
-      const { id: _id, ...settingsOnly } = settingsData as any;
-      setSettings(settingsOnly);
-    } catch (err) {
-      console.error("DataContext refresh failed:", err);
-    }
+    const [
+      doctorsData, appointmentsData, revenueData, institutesData,
+      bannersData, reviewsData, patientsData, auditData, teleData, settingsData,
+    ] = await Promise.all([
+      safeApiFetch<Doctor[]>("/providers", []),
+      safeApiFetch<Appointment[]>("/appointments", []),
+      safeApiFetch<RevenueEntry[]>("/revenue", []),
+      safeApiFetch<Institute[]>("/institutes", []),
+      safeApiFetch<Banner[]>("/banners", []),
+      safeApiFetch<Review[]>("/reviews", []),
+      safeApiFetch<Patient[]>("/patients", []),
+      safeApiFetch<AuditLog[]>("/audit", []),
+      safeApiFetch<TeleradiologyCase[]>("/teleradiology", []),
+      safeApiFetch<PlatformSettings>("/settings", DEFAULT_SETTINGS),
+    ]);
+    setDoctors(doctorsData);
+    setAppointments(appointmentsData);
+    setRevenue(revenueData);
+    setInstitutes(institutesData);
+    setBanners(bannersData);
+    setReviews(reviewsData);
+    setPatients(patientsData);
+    setAuditLogs(auditData);
+    setTeleradiologyCases(teleData);
+    const { id: _id, ...settingsOnly } = settingsData as PlatformSettings & { id?: string };
+    setSettings(settingsOnly);
   }, []);
 
   useEffect(() => {
