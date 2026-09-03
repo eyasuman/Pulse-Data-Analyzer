@@ -15,7 +15,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 const TOOLS = [
   { title: "Institutes", sub: (d: any) => `${d.institutes.filter((i: any) => i.status === "Active").length} active`, icon: "grid" as const, color: "#818cf8", route: "/institutes" },
   { title: "Banners", sub: (d: any) => `${d.banners.filter((b: any) => b.isActive).length} live`, icon: "image" as const, color: "#f59e0b", route: "/banners" },
-  { title: "Reviews", sub: (d: any) => `${d.reviews.filter((r: any) => r.status === "visible" || r.status === "pinned").length} visible`, icon: "star" as const, color: "#f59e0b", route: "/reviews" },
+  { title: "License Review", sub: (d: any) => { const n = d.doctors.filter((doc: any) => doc.licenseFile && doc.status === "Pending").length; return n > 0 ? `${n} pending` : "All verified"; }, icon: "shield" as const, color: "#10b981", route: "/license-review" },
+  { title: "Payment Review", sub: (d: any) => { const n = d.appointments.filter((a: any) => a.paymentStatus === "pending" && a.paymentProofUrl).length; return n > 0 ? `${n} pending` : "All reviewed"; }, icon: "credit-card" as const, color: "#f59e0b", route: "/payment-review" },
+  { title: "Reviews", sub: (d: any) => `${d.reviews.filter((r: any) => r.status === "visible" || r.status === "pinned").length} visible`, icon: "star" as const, color: "#818cf8", route: "/reviews" },
   { title: "Patients", sub: (d: any) => `${d.patients.filter((p: any) => p.status === "active").length} active`, icon: "users" as const, color: "#10b981", route: "/patients" },
   { title: "Teleradiology", sub: (d: any) => `${d.teleradiologyCases.filter((c: any) => c.status === "urgent").length} urgent`, icon: "radio" as const, color: "#ef4444", route: "/teleradiology" },
   { title: "Audit Log", sub: (d: any) => `${d.auditLogs.length} entries`, icon: "list" as const, color: "#94a3b8", route: "/audit" },

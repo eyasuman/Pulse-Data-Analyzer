@@ -1,7 +1,10 @@
 import { Router } from "express";
-import { sbSelect } from "../lib/supabase";
+import { sbSelect, sbUpdate } from "../lib/supabase";
+import { writeAudit } from "../lib/audit";
 
 const router = Router();
+
+// ─── All appointments ─────────────────────────────────────────────────────────
 
 router.get("/appointments", async (req, res) => {
   try {
@@ -12,6 +15,57 @@ router.get("/appointments", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── Pending payment proof review ─────────────────────────────────────────────
+
+/**
+ * Returns appointments where paymentStatus = 'pending'.
+ * These are the ones the admin needs to manually review.
+ */
+router.get("/appointments/payment-pending", async (req, res) => {
+  try {
+    const rows = await sbSelect(
+      "appointments",
+      "?paymentStatus=eq.pending&order=createdAt.asc"
+    );
+    res.json(rows.map(normalizeAppointment));
+  } catch (err) {
+    req.log.error({ err }, "GET /appointments/payment-pending failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── Update payment status ────────────────────────────────────────────────────
+
+/**
+ * Admin verifies or rejects a payment proof.
+ * Setting paymentStatus = 'verified' on a 'scheduled' appointment
+ * automatically unlocks the patient's video consultation in real time
+ * (the mobile app subscribes to changes on this row via Supabase Realtime).
+ */
+router.patch("/appointments/:id/payment-status", async (req, res) => {
+  const { id } = req.params;
+  const { paymentStatus } = req.body as { paymentStatus: string };
+  const valid = ["verified", "rejected", "pending"];
+  if (!valid.includes(paymentStatus)) {
+    return res.status(400).json({ error: "Invalid paymentStatus. Use: verified, rejected, pending" });
+  }
+  try {
+    const [current] = await sbSelect("appointments", `?id=eq.${id}`);
+    if (!current) return res.status(404).json({ error: "Not found" });
+    const updated = await sbUpdate("appointments", `id=eq.${id}`, { paymentStatus });
+    await writeAudit(
+      `payment status set to ${paymentStatus} for appointment #${id.slice(-6)} (${current.patientName ?? current.patient_name ?? ""})`,
+      "appointment"
+    );
+    res.json(normalizeAppointment(updated));
+  } catch (err) {
+    req.log.error({ err }, "PATCH /appointments/:id/payment-status failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── Normalizer ───────────────────────────────────────────────────────────────
 
 function normalizeAppointment(row: any) {
   const consultationFee = row.consultationFee ?? row.consultation_fee ?? 0;
@@ -30,6 +84,13 @@ function normalizeAppointment(row: any) {
     totalPrice,
     date: row.date ?? row.scheduledAt ?? row.scheduled_at ?? new Date().toISOString(),
     serviceType: row.serviceType ?? row.service_type ?? "In-Person Visit",
+    // Payment proof fields — treat null status as 'pending' when proof exists
+    paymentStatus: (row.paymentStatus ?? row.payment_status) ||
+      ((row.paymentProofUrl ?? row.payment_proof_url) ? "pending" : null),
+    paymentProofUrl: row.paymentProofUrl ?? row.payment_proof_url ?? null,
+    transactionId: row.transactionId ?? row.transaction_id ?? null,
+    senderName: row.senderName ?? row.sender_name ?? null,
+    paymentMethod: row.paymentMethod ?? row.payment_method ?? null,
     createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
   };
 }

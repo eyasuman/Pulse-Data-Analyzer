@@ -3,9 +3,17 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 export type DoctorStatus = "Pending" | "Active" | "Disabled" | "Declined";
 export type ProviderType = "Doctor" | "Nurse" | "Home Care" | "Physiotherapist" | "Healthcare Facility";
 export type AppointmentStatus = "pending" | "scheduled" | "completed" | "cancelled" | "declined";
+export type PaymentStatus = "pending" | "verified" | "rejected";
+
+export interface LicenseFile {
+  path: string;
+  name: string;
+  type: string;
+}
 
 export interface Doctor {
   id: string;
+  userId?: string;
   name: string;
   category: string;
   providerType?: string;
@@ -17,6 +25,7 @@ export interface Doctor {
   consultationFee: number;
   experienceYears?: number;
   licenseNo: string;
+  licenseFile?: LicenseFile | null;
   avatarUrl?: string;
   bio?: string;
   serviceModes: { video: boolean; audio: boolean; inPerson: boolean; homeVisit: boolean };
@@ -34,6 +43,12 @@ export interface Appointment {
   totalPrice: number;
   date: string;
   serviceType: string;
+  // Payment proof fields (from PULSE Supabase schema)
+  paymentStatus?: PaymentStatus | null;
+  paymentProofUrl?: string | null;
+  transactionId?: string | null;
+  senderName?: string | null;
+  paymentMethod?: string | null;
   createdAt: string;
 }
 
@@ -63,20 +78,23 @@ export interface Institute {
   createdAt: string;
 }
 
-export type BannerType = "image" | "promo" | "alert" | "info";
+// Banner schema matches public.banners in PULSE Supabase
 export interface Banner {
   id: string;
   title: string;
   message: string;
-  type: BannerType;
+  /** Defaults to 'photo' in DB */
+  type: string;
   isActive: boolean;
+  /** Higher priority = shown first (sorted DESC) */
   priority: number;
-  promoCode?: string;
-  linkUrl?: string;
+  promoCode?: string | null;
+  /** Public URL of banner image in `banners` storage bucket */
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  linkUrl?: string | null;
   displayDuration: number;
-  targetAudience: "All" | "Patients" | "Providers";
   createdAt: string;
-  expiresAt?: string;
 }
 
 export type ReviewStatus = "visible" | "pinned" | "banned" | "shadow_banned";
@@ -133,19 +151,19 @@ export interface PlatformSettings {
   inactivityTimeoutMinutes: number;
 }
 
+// ─── API fetch ────────────────────────────────────────────────────────────────
+
 function getApiBase(): string {
   if (typeof window !== "undefined" && window.location?.hostname) {
     const h = window.location.hostname;
-    if (h === "localhost" || h === "127.0.0.1") {
-      return "http://localhost/api";
-    }
+    if (h === "localhost" || h === "127.0.0.1") return "http://localhost/api";
     const apiHost = h.replace(".expo.janeway.replit.dev", ".janeway.replit.dev");
     return `https://${apiHost}/api`;
   }
   return process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost/api";
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const base = getApiBase();
   const res = await fetch(`${base}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -157,6 +175,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+// ─── Context value ────────────────────────────────────────────────────────────
 
 interface DataContextValue {
   doctors: Doctor[];
@@ -170,17 +190,42 @@ interface DataContextValue {
   teleradiologyCases: TeleradiologyCase[];
   settings: PlatformSettings;
   isLoading: boolean;
+
+  // Providers
   updateDoctorStatus: (id: string, status: DoctorStatus) => Promise<void>;
+  /** Approve (true) or reject (false) a doctor's uploaded license */
+  verifyDoctorLicense: (id: string, approved: boolean) => Promise<void>;
+  /** Get a short-lived signed URL for a doctor's private license file */
+  getDoctorLicenseUrl: (id: string) => Promise<{ signedUrl: string; fileName: string }>;
+
+  // Institutes
   addInstitute: (data: Omit<Institute, "id" | "createdAt">) => Promise<void>;
   updateInstituteStatus: (id: string, status: InstituteStatus) => Promise<void>;
+
+  // Banners
   addBanner: (data: Omit<Banner, "id" | "createdAt">) => Promise<void>;
   toggleBanner: (id: string) => Promise<void>;
   deleteBanner: (id: string) => Promise<void>;
+  /** Upload a banner image (base64) to the `banners` storage bucket. Returns public imageUrl. */
+  uploadBannerImage: (base64: string, contentType: string, ext: string) => Promise<string>;
+
+  // Reviews
   updateReviewStatus: (id: string, status: ReviewStatus) => Promise<void>;
+
+  // Patients
   togglePatientStatus: (id: string) => Promise<void>;
+
+  // Appointments — payment proof
+  /** Set paymentStatus to 'verified' or 'rejected' */
+  updatePaymentStatus: (id: string, paymentStatus: PaymentStatus) => Promise<void>;
+
+  // Teleradiology
   updateCaseStatus: (id: string, status: TeleradiologyCase["status"]) => Promise<void>;
+
+  // Settings
   updateSettings: (s: PlatformSettings) => Promise<void>;
   changeGatewayPassword: (newPassword: string) => Promise<void>;
+
   refresh: () => Promise<void>;
 }
 
@@ -211,16 +256,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const [
-        doctorsData,
-        appointmentsData,
-        revenueData,
-        institutesData,
-        bannersData,
-        reviewsData,
-        patientsData,
-        auditData,
-        teleData,
-        settingsData,
+        doctorsData, appointmentsData, revenueData, institutesData,
+        bannersData, reviewsData, patientsData, auditData, teleData, settingsData,
       ] = await Promise.all([
         apiFetch<Doctor[]>("/providers"),
         apiFetch<Appointment[]>("/appointments"),
@@ -250,49 +287,56 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      await refresh();
-      setIsLoading(false);
-    })();
+    (async () => { setIsLoading(true); await refresh(); setIsLoading(false); })();
   }, [refresh]);
+
+  // ── Providers ──────────────────────────────────────────────────────────────
 
   const updateDoctorStatus = async (id: string, status: DoctorStatus) => {
     const updated = await apiFetch<Doctor>(`/providers/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
+      method: "PATCH", body: JSON.stringify({ status }),
     });
     setDoctors((prev) => prev.map((d) => (d.id === id ? updated : d)));
   };
 
+  const verifyDoctorLicense = async (id: string, approved: boolean) => {
+    const updated = await apiFetch<Doctor>(`/providers/${id}/verify`, {
+      method: "PATCH", body: JSON.stringify({ approved }),
+    });
+    setDoctors((prev) => prev.map((d) => (d.id === id ? updated : d)));
+  };
+
+  const getDoctorLicenseUrl = async (id: string) => {
+    return apiFetch<{ signedUrl: string; fileName: string }>(`/providers/${id}/license-url`);
+  };
+
+  // ── Institutes ─────────────────────────────────────────────────────────────
+
   const addInstitute = async (data: Omit<Institute, "id" | "createdAt">) => {
     const created = await apiFetch<Institute>("/institutes", {
-      method: "POST",
-      body: JSON.stringify(data),
+      method: "POST", body: JSON.stringify(data),
     });
     setInstitutes((prev) => [created, ...prev]);
   };
 
   const updateInstituteStatus = async (id: string, status: InstituteStatus) => {
     const updated = await apiFetch<Institute>(`/institutes/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
+      method: "PATCH", body: JSON.stringify({ status }),
     });
     setInstitutes((prev) => prev.map((i) => (i.id === id ? updated : i)));
   };
 
+  // ── Banners ────────────────────────────────────────────────────────────────
+
   const addBanner = async (data: Omit<Banner, "id" | "createdAt">) => {
     const created = await apiFetch<Banner>("/banners", {
-      method: "POST",
-      body: JSON.stringify(data),
+      method: "POST", body: JSON.stringify(data),
     });
-    setBanners((prev) => [...prev, created]);
+    setBanners((prev) => [created, ...prev]);
   };
 
   const toggleBanner = async (id: string) => {
-    const updated = await apiFetch<Banner>(`/banners/${id}/toggle`, {
-      method: "PATCH",
-    });
+    const updated = await apiFetch<Banner>(`/banners/${id}/toggle`, { method: "PATCH" });
     setBanners((prev) => prev.map((b) => (b.id === id ? updated : b)));
   };
 
@@ -301,33 +345,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setBanners((prev) => prev.filter((b) => b.id !== id));
   };
 
+  const uploadBannerImage = async (base64: string, contentType: string, ext: string): Promise<string> => {
+    const result = await apiFetch<{ imageUrl: string }>("/banners/upload-image", {
+      method: "POST", body: JSON.stringify({ base64, contentType, ext }),
+    });
+    return result.imageUrl;
+  };
+
+  // ── Reviews ────────────────────────────────────────────────────────────────
+
   const updateReviewStatus = async (id: string, status: ReviewStatus) => {
     const updated = await apiFetch<Review>(`/reviews/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
+      method: "PATCH", body: JSON.stringify({ status }),
     });
     setReviews((prev) => prev.map((r) => (r.id === id ? updated : r)));
   };
 
+  // ── Patients ───────────────────────────────────────────────────────────────
+
   const togglePatientStatus = async (id: string) => {
-    const updated = await apiFetch<Patient>(`/patients/${id}/toggle`, {
-      method: "PATCH",
-    });
+    const updated = await apiFetch<Patient>(`/patients/${id}/toggle`, { method: "PATCH" });
     setPatients((prev) => prev.map((p) => (p.id === id ? updated : p)));
   };
 
+  // ── Appointments — payment proof ───────────────────────────────────────────
+
+  const updatePaymentStatus = async (id: string, paymentStatus: PaymentStatus) => {
+    const updated = await apiFetch<Appointment>(`/appointments/${id}/payment-status`, {
+      method: "PATCH", body: JSON.stringify({ paymentStatus }),
+    });
+    setAppointments((prev) => prev.map((a) => (a.id === id ? updated : a)));
+  };
+
+  // ── Teleradiology ──────────────────────────────────────────────────────────
+
   const updateCaseStatus = async (id: string, status: TeleradiologyCase["status"]) => {
     const updated = await apiFetch<TeleradiologyCase>(`/teleradiology/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
+      method: "PATCH", body: JSON.stringify({ status }),
     });
     setTeleradiologyCases((prev) => prev.map((c) => (c.id === id ? updated : c)));
   };
 
+  // ── Settings ───────────────────────────────────────────────────────────────
+
   const updateSettings = async (s: PlatformSettings) => {
     const updated = await apiFetch<PlatformSettings>("/settings", {
-      method: "PUT",
-      body: JSON.stringify(s),
+      method: "PUT", body: JSON.stringify(s),
     });
     const { id: _id, ...settingsData } = updated as any;
     setSettings(settingsData);
@@ -335,23 +398,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const changeGatewayPassword = async (newPassword: string) => {
     await apiFetch("/settings/gateway-password", {
-      method: "PATCH",
-      body: JSON.stringify({ password: newPassword }),
+      method: "PATCH", body: JSON.stringify({ password: newPassword }),
     });
     setSettings((prev) => ({ ...prev, gatewayPassword: newPassword }));
   };
 
   return (
-    <DataContext.Provider
-      value={{
-        doctors, appointments, revenue, institutes, banners, reviews,
-        patients, auditLogs, teleradiologyCases, settings,
-        updateDoctorStatus, addInstitute, updateInstituteStatus,
-        addBanner, toggleBanner, deleteBanner,
-        updateReviewStatus, togglePatientStatus, updateCaseStatus, updateSettings,
-        changeGatewayPassword, isLoading, refresh,
-      }}
-    >
+    <DataContext.Provider value={{
+      doctors, appointments, revenue, institutes, banners, reviews,
+      patients, auditLogs, teleradiologyCases, settings, isLoading,
+      updateDoctorStatus, verifyDoctorLicense, getDoctorLicenseUrl,
+      addInstitute, updateInstituteStatus,
+      addBanner, toggleBanner, deleteBanner, uploadBannerImage,
+      updateReviewStatus, togglePatientStatus, updatePaymentStatus,
+      updateCaseStatus, updateSettings, changeGatewayPassword, refresh,
+    }}>
       {children}
     </DataContext.Provider>
   );

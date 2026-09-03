@@ -1,21 +1,22 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
-  Modal, ScrollView, TextInput, Switch, KeyboardAvoidingView,
+  Modal, ScrollView, TextInput, Switch, KeyboardAvoidingView, Image,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
-import { useData, Banner, BannerType } from "@/context/DataContext";
+import { useData, Banner } from "@/context/DataContext";
 
-const TYPE_META: Record<BannerType, { color: string; icon: any; label: string }> = {
-  image: { color: "#818cf8", icon: "image", label: "Image" },
+const TYPE_META: Record<string, { color: string; icon: any; label: string }> = {
+  photo: { color: "#818cf8", icon: "image", label: "Photo" },
   promo: { color: "#f59e0b", icon: "tag", label: "Promo" },
   alert: { color: "#ef4444", icon: "alert-triangle", label: "Alert" },
   info: { color: "#10b981", icon: "info", label: "Info" },
 };
-const AUDIENCE_OPTIONS = ["All", "Patients", "Providers"] as const;
 
 function SummaryPill({ label, value, color, colors }: any) {
   return (
@@ -31,31 +32,79 @@ const pillStyles = StyleSheet.create({
   value: { fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });
 
+const DEFAULT_FORM = {
+  title: "", message: "", type: "photo",
+  isActive: true, priority: 5, promoCode: "",
+  linkUrl: "", imageUrl: "",
+};
+
 export default function BannersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { banners, addBanner, toggleBanner, deleteBanner } = useData();
+  const { banners, addBanner, toggleBanner, deleteBanner, uploadBannerImage } = useData();
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
-  const [form, setForm] = useState({ title: "", message: "", type: "info" as BannerType, isActive: true, priority: 5, promoCode: "", targetAudience: "All" as "All" | "Patients" | "Providers", displayDuration: 5 });
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const filtered = banners
-    .filter((b) => activeFilter === "active" ? b.isActive : activeFilter === "inactive" ? !b.isActive : true)
-    .sort((a, b) => a.priority - b.priority);
+    .filter((b) => activeFilter === "active" ? b.isActive : activeFilter === "inactive" ? !b.isActive : true);
+  // Already sorted DESC by priority from the API
   const activeCt = banners.filter((b) => b.isActive).length;
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
+  const handlePickImage = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert("Permission Required", "Allow photo access to upload banner images."); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      base64: true,
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [16, 9],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const ext = mimeType.split("/")[1] ?? "jpg";
+    const b64 = asset.base64;
+    if (!b64) { Alert.alert("Error", "Could not read image data."); return; }
+    setUploading(true);
+    try {
+      const imageUrl = await uploadBannerImage(b64, mimeType, ext);
+      setForm((f) => ({ ...f, imageUrl }));
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err?.message ?? "Could not upload image.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleAdd = async () => {
-    if (!form.title.trim() || !form.message.trim()) { Alert.alert("Required", "Title and message required."); return; }
+    if (!form.title.trim() || !form.message.trim()) { Alert.alert("Required", "Title and message are required."); return; }
     setSaving(true);
     try {
-      await addBanner({ ...form, linkUrl: undefined, expiresAt: undefined });
+      await addBanner({
+        title: form.title,
+        message: form.message,
+        type: form.type,
+        isActive: form.isActive,
+        priority: form.priority,
+        promoCode: form.promoCode || null,
+        imageUrl: form.imageUrl || null,
+        videoUrl: null,
+        linkUrl: form.linkUrl || null,
+        displayDuration: 5,
+      });
       setShowAddModal(false);
-      setForm({ title: "", message: "", type: "info", isActive: true, priority: 5, promoCode: "", targetAudience: "All", displayDuration: 5 });
-    } catch { Alert.alert("Error", "Failed to add banner."); }
-    finally { setSaving(false); }
+      setForm(DEFAULT_FORM);
+    } catch (err: any) {
+      Alert.alert("Error", err?.message ?? "Failed to add banner.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -117,6 +166,7 @@ export default function BannersScreen() {
         }
       />
 
+      {/* Add Banner Modal */}
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
@@ -128,44 +178,75 @@ export default function BannersScreen() {
                 </Pressable>
               </View>
 
-              <ModalField label="Title *" value={form.title} onChangeText={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Banner title" colors={colors} />
-              <ModalField label="Message *" value={form.message} onChangeText={(v) => setForm(f => ({ ...f, message: v }))} placeholder="Banner message" colors={colors} multiline />
-              <ModalField label="Promo Code" value={form.promoCode} onChangeText={(v) => setForm(f => ({ ...f, promoCode: v }))} placeholder="Optional promo code" colors={colors} />
+              <ModalField label="Title *" value={form.title} onChangeText={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Banner headline" colors={colors} />
+              <ModalField label="Message *" value={form.message} onChangeText={(v) => setForm(f => ({ ...f, message: v }))} placeholder="Banner subtext" colors={colors} multiline />
+              <ModalField label="Promo Code" value={form.promoCode} onChangeText={(v) => setForm(f => ({ ...f, promoCode: v }))} placeholder="Optional — shown as PROMO badge" colors={colors} />
+              <ModalField label="Link URL" value={form.linkUrl} onChangeText={(v) => setForm(f => ({ ...f, linkUrl: v }))} placeholder="https://... (opens on tap)" colors={colors} keyboardType="url" />
 
+              {/* Image upload */}
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>BANNER IMAGE</Text>
+              {form.imageUrl ? (
+                <View style={styles.imagePreviewWrap}>
+                  <Image source={{ uri: form.imageUrl }} style={styles.imagePreview} resizeMode="cover" />
+                  <Pressable onPress={() => setForm(f => ({ ...f, imageUrl: "" }))} style={[styles.removeImageBtn, { backgroundColor: "#ef444420", borderColor: "#ef444440" }]}>
+                    <Feather name="trash-2" size={12} color="#ef4444" />
+                    <Text style={[styles.removeImageText, { color: "#ef4444" }]}>Remove</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable onPress={handlePickImage} disabled={uploading} style={[styles.uploadBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: uploading ? 0.7 : 1 }]}>
+                  {uploading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Feather name="upload" size={18} color={colors.mutedForeground} />
+                  )}
+                  <Text style={[styles.uploadText, { color: uploading ? colors.primary : colors.mutedForeground }]}>
+                    {uploading ? "Uploading to Supabase…" : "Pick image (PNG/JPEG/WEBP · max 5MB)"}
+                  </Text>
+                </Pressable>
+              )}
+
+              {/* Type */}
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>TYPE</Text>
               <View style={styles.optionRow}>
-                {(Object.keys(TYPE_META) as BannerType[]).map((t) => {
-                  const m = TYPE_META[t];
-                  return (
-                    <Pressable key={t} onPress={() => setForm(f => ({ ...f, type: t }))} style={[styles.typeOption, { backgroundColor: form.type === t ? m.color + "20" : colors.card, borderColor: form.type === t ? m.color : colors.border }]}>
-                      <Feather name={m.icon} size={12} color={form.type === t ? m.color : colors.mutedForeground} />
-                      <Text style={[styles.typeOptionText, { color: form.type === t ? m.color : colors.foreground }]}>{m.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>AUDIENCE</Text>
-              <View style={styles.optionRow}>
-                {AUDIENCE_OPTIONS.map((a) => (
-                  <Pressable key={a} onPress={() => setForm(f => ({ ...f, targetAudience: a }))} style={[styles.typeOption, { backgroundColor: form.targetAudience === a ? colors.primary + "20" : colors.card, borderColor: form.targetAudience === a ? colors.primary : colors.border }]}>
-                    <Text style={[styles.typeOptionText, { color: form.targetAudience === a ? colors.primary : colors.foreground }]}>{a}</Text>
+                {Object.entries(TYPE_META).map(([t, m]) => (
+                  <Pressable key={t} onPress={() => setForm(f => ({ ...f, type: t }))} style={[styles.typeOption, { backgroundColor: form.type === t ? m.color + "20" : colors.card, borderColor: form.type === t ? m.color : colors.border }]}>
+                    <Feather name={m.icon} size={12} color={form.type === t ? m.color : colors.mutedForeground} />
+                    <Text style={[styles.typeOptionText, { color: form.type === t ? m.color : colors.foreground }]}>{m.label}</Text>
                   </Pressable>
                 ))}
               </View>
 
+              {/* Priority */}
+              <View style={{ gap: 5 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PRIORITY (higher = shown first)</Text>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                  value={String(form.priority)}
+                  onChangeText={(v) => setForm(f => ({ ...f, priority: parseInt(v) || 0 }))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+
               <View style={[styles.switchRow, { borderColor: colors.border }]}>
                 <Text style={[styles.switchLabel, { color: colors.foreground }]}>Active</Text>
-                <Switch value={form.isActive} onValueChange={(v) => setForm(f => ({ ...f, isActive: v }))} trackColor={{ false: colors.border, true: colors.primary + "88" }} thumbColor={form.isActive ? colors.primary : colors.mutedForeground} />
+                <Switch
+                  value={form.isActive}
+                  onValueChange={(v) => setForm(f => ({ ...f, isActive: v }))}
+                  trackColor={{ false: colors.border, true: colors.primary + "88" }}
+                  thumbColor={form.isActive ? colors.primary : colors.mutedForeground}
+                />
               </View>
 
               <View style={styles.modalFooter}>
                 <Pressable onPress={() => setShowAddModal(false)} style={[styles.cancelBtn, { borderColor: colors.border }]}>
                   <Text style={[styles.cancelText, { color: colors.foreground }]}>Cancel</Text>
                 </Pressable>
-                <Pressable onPress={handleAdd} disabled={saving} style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}>
+                <Pressable onPress={handleAdd} disabled={saving || uploading} style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: saving || uploading ? 0.7 : 1 }]}>
                   <Feather name="plus" size={14} color="#fff" />
-                  <Text style={styles.submitText}>{saving ? "Adding..." : "Add Banner"}</Text>
+                  <Text style={styles.submitText}>{saving ? "Adding…" : "Add Banner"}</Text>
                 </Pressable>
               </View>
             </ScrollView>
@@ -182,16 +263,22 @@ function ModalField({ label, value, onChangeText, placeholder, colors, multiline
       <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <TextInput
         style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground, ...(multiline ? { minHeight: 80, textAlignVertical: "top" } : {}) }]}
-        value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} multiline={multiline} keyboardType={keyboardType}
+        value={value} onChangeText={onChangeText} placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground} multiline={multiline} keyboardType={keyboardType}
       />
     </View>
   );
 }
 
 function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; colors: any; onToggle: () => void; onDelete: () => void }) {
-  const m = TYPE_META[banner.type] ?? TYPE_META.info;
+  const m = TYPE_META[banner.type] ?? TYPE_META.photo;
   return (
     <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Image preview if available */}
+      {banner.imageUrl ? (
+        <Image source={{ uri: banner.imageUrl }} style={cardStyles.bannerImage} resizeMode="cover" />
+      ) : null}
+
       <View style={cardStyles.header}>
         <View style={[cardStyles.typeIcon, { backgroundColor: m.color + "15", borderColor: m.color + "30" }]}>
           <Feather name={m.icon} size={16} color={m.color} />
@@ -202,25 +289,35 @@ function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; co
             <View style={[cardStyles.typeBadge, { backgroundColor: m.color + "15", borderColor: m.color + "30" }]}>
               <Text style={[cardStyles.typeBadgeText, { color: m.color }]}>{m.label.toUpperCase()}</Text>
             </View>
-            <View style={[cardStyles.audienceBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-              <Feather name="users" size={9} color={colors.mutedForeground} />
-              <Text style={[cardStyles.audienceText, { color: colors.mutedForeground }]}>{banner.targetAudience}</Text>
-            </View>
+            {banner.promoCode ? (
+              <View style={[cardStyles.promoBadge, { backgroundColor: "#f59e0b15", borderColor: "#f59e0b30" }]}>
+                <Feather name="tag" size={9} color="#f59e0b" />
+                <Text style={[cardStyles.promoText, { color: "#f59e0b" }]}>{banner.promoCode}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
-        <Switch value={banner.isActive} onValueChange={onToggle} trackColor={{ false: colors.border, true: "#10b98188" }} thumbColor={banner.isActive ? "#10b981" : colors.mutedForeground} ios_backgroundColor={colors.border} />
+        <Switch
+          value={banner.isActive}
+          onValueChange={onToggle}
+          trackColor={{ false: colors.border, true: "#10b98188" }}
+          thumbColor={banner.isActive ? "#10b981" : colors.mutedForeground}
+          ios_backgroundColor={colors.border}
+        />
       </View>
+
       <Text style={[cardStyles.message, { color: colors.mutedForeground }]} numberOfLines={2}>{banner.message}</Text>
+
       <View style={[cardStyles.footer, { borderTopColor: colors.border }]}>
         <View style={cardStyles.footerLeft}>
           <View style={[cardStyles.priorityBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
             <Feather name="layers" size={9} color={colors.mutedForeground} />
             <Text style={[cardStyles.priorityText, { color: colors.mutedForeground }]}>P{banner.priority}</Text>
           </View>
-          {banner.promoCode ? (
-            <View style={[cardStyles.promoBadge, { backgroundColor: "#f59e0b15", borderColor: "#f59e0b30" }]}>
-              <Feather name="tag" size={9} color="#f59e0b" />
-              <Text style={[cardStyles.promoText, { color: "#f59e0b" }]}>{banner.promoCode}</Text>
+          {banner.linkUrl ? (
+            <View style={[cardStyles.priorityBadge, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Feather name="link" size={9} color={colors.mutedForeground} />
+              <Text style={[cardStyles.priorityText, { color: colors.mutedForeground }]}>Link</Text>
             </View>
           ) : null}
         </View>
@@ -233,23 +330,22 @@ function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; co
 }
 
 const cardStyles = StyleSheet.create({
-  card: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10, gap: 10 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10 },
+  card: { borderRadius: 14, borderWidth: 1, overflow: "hidden", marginBottom: 10 },
+  bannerImage: { width: "100%", height: 140, backgroundColor: "#1e293b" },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, paddingBottom: 6 },
   typeIcon: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerMid: { flex: 1, gap: 4 },
   bannerTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
   metaRow: { flexDirection: "row", gap: 5, flexWrap: "wrap" },
   typeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
   typeBadgeText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.8 },
-  audienceBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
-  audienceText: { fontSize: 9, fontWeight: "500" },
-  message: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular" },
-  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTopWidth: 1 },
-  footerLeft: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  promoBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
+  promoText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
+  message: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", paddingHorizontal: 12 },
+  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, marginTop: 8 },
+  footerLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
   priorityBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
   priorityText: { fontSize: 9, fontWeight: "500" },
-  promoBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  promoText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
   deleteBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
 
@@ -278,6 +374,12 @@ const styles = StyleSheet.create({
   closeBtn: { width: 34, height: 34, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   fieldLabel: { fontSize: 10, fontWeight: "600", letterSpacing: 0.8, textTransform: "uppercase" },
   fieldInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  uploadBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", paddingVertical: 24 },
+  uploadText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  imagePreviewWrap: { gap: 8 },
+  imagePreview: { width: "100%", height: 160, borderRadius: 12 },
+  removeImageBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, borderWidth: 1, paddingVertical: 8 },
+  removeImageText: { fontSize: 12, fontWeight: "600" },
   optionRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   typeOption: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   typeOptionText: { fontSize: 12, fontWeight: "500" },

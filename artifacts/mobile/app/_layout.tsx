@@ -21,18 +21,21 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="provider/[id]"
-        options={{ headerShown: false, presentation: Platform.OS === "ios" ? "modal" : "card" }}
+        options={{ presentation: Platform.OS === "ios" ? "modal" : "card" }}
       />
-      <Stack.Screen name="institutes/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="banners/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="reviews/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="patients/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="audit/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="settings/index" options={{ headerShown: false, animation: "slide_from_right" }} />
-      <Stack.Screen name="teleradiology/index" options={{ headerShown: false, animation: "slide_from_right" }} />
+      <Stack.Screen name="institutes/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="banners/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="reviews/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="patients/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="audit/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="settings/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="teleradiology/index" options={{ animation: "slide_from_right" }} />
+      {/* New admin screens */}
+      <Stack.Screen name="license-review/index" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="payment-review/index" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }
