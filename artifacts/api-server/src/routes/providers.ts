@@ -29,7 +29,7 @@ router.patch("/providers/:id/status", async (req, res) => {
     const [current] = await sbSelect("doctors", `?id=eq.${id}`);
     if (!current) return res.status(404).json({ error: "Not found" });
     const updated = await sbUpdate("doctors", `id=eq.${id}`, { status });
-    await writeAudit(`set provider ${current.name} status to ${status}`, "provider");
+    void writeAudit(`set provider ${current.name} status to ${status}`, "provider");
     res.json(normalizeDoctor(updated));
   } catch (err) {
     req.log.error({ err }, "PATCH /providers/:id/status failed");
@@ -111,7 +111,7 @@ router.patch("/providers/:id/verify", async (req, res) => {
     const [current] = await sbSelect("doctors", `?id=eq.${id}`);
     if (!current) return res.status(404).json({ error: "Not found" });
     const updated = await sbUpdate("doctors", `id=eq.${id}`, { status: newStatus });
-    await writeAudit(
+    void writeAudit(
       `${approved ? "approved" : "rejected"} license for provider ${current.name}`,
       "provider"
     );

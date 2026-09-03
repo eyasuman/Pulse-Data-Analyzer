@@ -45,6 +45,7 @@ export default function LicenseReviewScreen() {
   };
 
   const handleVerify = (doctor: Doctor, approved: boolean) => {
+    if (loadingId) return;
     Alert.alert(
       approved ? "Approve License" : "Reject License",
       `${approved ? "Approve" : "Reject"} ${doctor.name}'s license?\n\n${approved ? "Their provider account will be activated." : "Their account will be set to Declined."}`,
@@ -54,16 +55,17 @@ export default function LicenseReviewScreen() {
           text: approved ? "Approve" : "Reject",
           style: approved ? "default" : "destructive",
           onPress: async () => {
+            if (loadingId) return;
             setLoadingId(doctor.id);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               await verifyDoctorLicense(doctor.id, approved);
               Alert.alert(
                 approved ? "✓ Approved" : "Rejected",
                 `${doctor.name} has been ${approved ? "activated as a provider" : "declined"}.`
               );
             } catch (err: any) {
-              Alert.alert("Error", err?.message ?? "Update failed.");
+              Alert.alert("Action Failed", err?.message ?? "Could not update the license. Please try again.");
             } finally {
               setLoadingId(null);
             }
