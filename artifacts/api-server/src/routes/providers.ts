@@ -62,12 +62,33 @@ router.get("/providers/:id/license-url", async (req, res) => {
   try {
     const [doctor] = await sbSelect("doctors", `?id=eq.${id}`);
     if (!doctor) return res.status(404).json({ error: "Not found" });
-    const licenseFile = doctor.licenseFile as { path?: string; name?: string } | null;
-    if (!licenseFile?.path) {
+    const licenseFile = doctor.licenseFile as { path?: string; name?: string; uploadId?: string } | string | null;
+    const uploadId =
+      (typeof licenseFile === "object" ? licenseFile?.uploadId : null)
+      ?? doctor.licenseUploadId
+      ?? doctor.license_upload_id;
+
+    let bucket = "medical-licenses";
+    let path = typeof licenseFile === "string" ? licenseFile : licenseFile?.path;
+    let fileName = typeof licenseFile === "object" ? licenseFile?.name : undefined;
+
+    if (uploadId) {
+      const [upload] = await sbSelect(
+        "user_uploads",
+        `?id=eq.${encodeURIComponent(uploadId)}&status=eq.active&select=bucket,storage_path,original_name`
+      );
+      if (upload?.storage_path) {
+        bucket = upload.bucket || "user-uploads";
+        path = upload.storage_path;
+        fileName = upload.original_name || fileName;
+      }
+    }
+
+    if (!path) {
       return res.status(404).json({ error: "No license file uploaded" });
     }
-    const signedUrl = await sbSignedUrl("medical-licenses", licenseFile.path, 600);
-    res.json({ signedUrl, fileName: licenseFile.name ?? "license" });
+    const signedUrl = await sbSignedUrl(bucket, path, 600);
+    res.json({ signedUrl, fileName: fileName ?? "license" });
   } catch (err) {
     req.log.error({ err }, "GET /providers/:id/license-url failed");
     res.status(500).json({ error: "Internal server error" });
@@ -82,6 +103,9 @@ router.get("/providers/:id/license-url", async (req, res) => {
 router.patch("/providers/:id/verify", async (req, res) => {
   const { id } = req.params;
   const { approved } = req.body as { approved: boolean };
+  if (typeof approved !== "boolean") {
+    return res.status(400).json({ error: "approved must be a boolean" });
+  }
   const newStatus = approved ? "Active" : "Declined";
   try {
     const [current] = await sbSelect("doctors", `?id=eq.${id}`);

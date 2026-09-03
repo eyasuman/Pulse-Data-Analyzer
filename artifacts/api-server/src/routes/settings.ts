@@ -15,10 +15,9 @@ const DEFAULT_SETTINGS = {
 
 router.get("/settings", async (req, res) => {
   try {
-    const rows = await sbSelect("platformSettings", "?limit=1");
+    const rows = await sbSelect("settings", "?limit=1");
     if (!rows.length) {
-      // Seed defaults if table is empty
-      const created = await sbInsert("platformSettings", DEFAULT_SETTINGS);
+      const created = await sbInsert("settings", toSettingsRow(DEFAULT_SETTINGS));
       return res.json(created ?? DEFAULT_SETTINGS);
     }
     res.json(normalizeSettings(rows[0]));
@@ -31,12 +30,13 @@ router.get("/settings", async (req, res) => {
 
 router.put("/settings", async (req, res) => {
   try {
-    const rows = await sbSelect("platformSettings", "?limit=1");
+    const rows = await sbSelect("settings", "?limit=1");
+    const payload = toSettingsRow(req.body);
     let updated: any;
     if (rows.length) {
-      updated = await sbUpdate("platformSettings", `id=eq.${rows[0].id}`, { ...req.body });
+      updated = await sbUpdate("settings", `id=eq.${rows[0].id}`, payload);
     } else {
-      updated = await sbInsert("platformSettings", { ...DEFAULT_SETTINGS, ...req.body });
+      updated = await sbInsert("settings", toSettingsRow({ ...DEFAULT_SETTINGS, ...req.body }));
     }
     await writeAudit("updated platform settings", "settings");
     res.json(normalizeSettings(updated));
@@ -50,9 +50,9 @@ router.patch("/settings/gateway-password", async (req, res) => {
   const { password } = req.body as { password: string };
   if (!password || password.length < 4) return res.status(400).json({ error: "Password too short" });
   try {
-    const rows = await sbSelect("platformSettings", "?limit=1");
+    const rows = await sbSelect("settings", "?limit=1");
     if (!rows.length) return res.status(404).json({ error: "Settings not found" });
-    const updated = await sbUpdate("platformSettings", `id=eq.${rows[0].id}`, { gatewayPassword: password });
+    const updated = await sbUpdate("settings", `id=eq.${rows[0].id}`, { gatewayPassword: password });
     await writeAudit("changed gateway password", "settings");
     res.json({ success: true, settings: normalizeSettings(updated) });
   } catch (err) {
@@ -64,12 +64,23 @@ router.patch("/settings/gateway-password", async (req, res) => {
 function normalizeSettings(row: any) {
   return {
     id: row.id,
-    platformFee: row.platformFee ?? DEFAULT_SETTINGS.platformFee,
-    cancellationNoticePeriodHours: row.cancellationNoticePeriodHours ?? DEFAULT_SETTINGS.cancellationNoticePeriodHours,
-    cancellationPenaltyFee: row.cancellationPenaltyFee ?? DEFAULT_SETTINGS.cancellationPenaltyFee,
+    platformFee: row.fixedPlatformFee ?? row.platformFee ?? DEFAULT_SETTINGS.platformFee,
+    cancellationNoticePeriodHours: row.noticePeriodHours ?? row.cancellationNoticePeriodHours ?? DEFAULT_SETTINGS.cancellationNoticePeriodHours,
+    cancellationPenaltyFee: row.penaltyFee ?? row.cancellationPenaltyFee ?? DEFAULT_SETTINGS.cancellationPenaltyFee,
     reminderCadence: row.reminderCadence ?? DEFAULT_SETTINGS.reminderCadence,
     gatewayPassword: row.gatewayPassword ?? DEFAULT_SETTINGS.gatewayPassword,
     inactivityTimeoutMinutes: row.inactivityTimeoutMinutes ?? DEFAULT_SETTINGS.inactivityTimeoutMinutes,
+  };
+}
+
+function toSettingsRow(settings: Partial<typeof DEFAULT_SETTINGS>) {
+  return {
+    fixedPlatformFee: settings.platformFee,
+    noticePeriodHours: settings.cancellationNoticePeriodHours,
+    penaltyFee: settings.cancellationPenaltyFee,
+    reminderCadence: settings.reminderCadence,
+    gatewayPassword: settings.gatewayPassword,
+    inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes,
   };
 }
 

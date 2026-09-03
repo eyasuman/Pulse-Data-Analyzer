@@ -30,6 +30,7 @@ export default function InstitutesScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState({ name: "", type: "Hospital" as InstituteType, city: "", address: "", phone: "", email: "", licenseNo: "" });
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let result = institutes;
@@ -58,6 +59,18 @@ export default function InstitutesScreen() {
       setForm({ name: "", type: "Hospital", city: "", address: "", phone: "", email: "", licenseNo: "" });
     } catch { Alert.alert("Error", "Failed to add institute."); }
     finally { setSaving(false); }
+  };
+
+  const handleStatusChange = async (id: string, status: InstituteStatus) => {
+    setUpdatingId(id);
+    try {
+      await updateInstituteStatus(id, status);
+      Alert.alert("Updated", `Institute status set to ${status}.`);
+    } catch (error: any) {
+      Alert.alert("Update Failed", error?.message ?? "Could not update institute status.");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   return (
@@ -96,10 +109,10 @@ export default function InstitutesScreen() {
         data={filtered}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <InstituteCard institute={item} colors={colors} onStatusChange={(s) =>
+          <InstituteCard institute={item} colors={colors} disabled={updatingId === item.id} onStatusChange={(s) =>
             Alert.alert("Change Status", `Set ${item.name} to ${s}?`, [
               { text: "Cancel", style: "cancel" },
-              { text: "Confirm", onPress: () => updateInstituteStatus(item.id, s) },
+              { text: "Confirm", onPress: () => handleStatusChange(item.id, s) },
             ])
           } />
         )}
@@ -162,7 +175,7 @@ function FieldInput({ label, value, onChangeText, placeholder, colors, keyboardT
   );
 }
 
-function InstituteCard({ institute, colors, onStatusChange }: { institute: Institute; colors: any; onStatusChange: (s: InstituteStatus) => void }) {
+function InstituteCard({ institute, colors, disabled, onStatusChange }: { institute: Institute; colors: any; disabled: boolean; onStatusChange: (s: InstituteStatus) => void }) {
   const statusColor = STATUS_COLORS[institute.status] ?? "#94a3b8";
   const nextStatuses = (["Active", "Pending", "Suspended"] as InstituteStatus[]).filter(s => s !== institute.status);
   return (
@@ -184,7 +197,7 @@ function InstituteCard({ institute, colors, onStatusChange }: { institute: Insti
           <View style={[cardStyles.statusBadge, { backgroundColor: statusColor + "15", borderColor: statusColor + "30" }]}>
             <Text style={[cardStyles.statusText, { color: statusColor }]}>{institute.status.toUpperCase()}</Text>
           </View>
-          <Pressable onPress={() => Alert.alert("Change Status", `${institute.name}`, nextStatuses.map(s => ({ text: s, onPress: () => onStatusChange(s) })).concat([{ text: "Cancel", style: "cancel" } as any]))}>
+          <Pressable disabled={disabled} onPress={() => Alert.alert("Change Status", `${institute.name}`, nextStatuses.map(s => ({ text: s, onPress: () => onStatusChange(s) })).concat([{ text: "Cancel", style: "cancel" } as any]))} style={{ opacity: disabled ? 0.5 : 1 }}>
             <Feather name="more-horizontal" size={14} color={colors.mutedForeground} />
           </Pressable>
         </View>

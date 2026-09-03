@@ -12,7 +12,7 @@ export default function PatientsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { patients, togglePatientStatus } = useData();
+  const { patients } = useData();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "suspended">("all");
 
@@ -73,14 +73,6 @@ export default function PatientsScreen() {
           <PatientCard
             patient={item}
             colors={colors}
-            onToggle={() => Alert.alert(
-              item.status === "active" ? "Suspend Patient" : "Reactivate Patient",
-              `${item.status === "active" ? "Suspend" : "Reactivate"} ${item.name}?`,
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Confirm", style: item.status === "active" ? "destructive" : "default", onPress: () => togglePatientStatus(item.id) },
-              ]
-            )}
           />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
@@ -91,7 +83,7 @@ export default function PatientsScreen() {
   );
 }
 
-function PatientCard({ patient, colors, onToggle }: { patient: Patient; colors: any; onToggle: () => void }) {
+function PatientCard({ patient, colors }: { patient: Patient; colors: any }) {
   const initials = patient.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
   const isActive = patient.status === "active";
   const statusColor = isActive ? "#10b981" : "#ef4444";
@@ -122,9 +114,7 @@ function PatientCard({ patient, colors, onToggle }: { patient: Patient; colors: 
           <View style={[cardStyles.statusBadge, { backgroundColor: statusColor + "15", borderColor: statusColor + "30" }]}>
             <Text style={[cardStyles.statusText, { color: statusColor }]}>{patient.status.toUpperCase()}</Text>
           </View>
-          <Pressable onPress={onToggle} style={[cardStyles.toggleBtn, { borderColor: isActive ? "#ef444430" : "#10b98130" }]}>
-            <Feather name={isActive ? "user-x" : "user-check"} size={12} color={isActive ? "#ef4444" : "#10b981"} />
-          </Pressable>
+          <Text style={[cardStyles.sourceLabel, { color: colors.mutedForeground }]}>FROM APPOINTMENTS</Text>
         </View>
       </View>
       <Text style={[cardStyles.joined, { color: colors.mutedForeground }]}>
@@ -149,6 +139,7 @@ const cardStyles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
   statusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.8 },
   toggleBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  sourceLabel: { maxWidth: 72, fontSize: 7, lineHeight: 10, textAlign: "right", fontWeight: "600", letterSpacing: 0.5 },
   joined: { fontSize: 9, fontFamily: "Inter_400Regular", marginTop: 2 },
 });
 

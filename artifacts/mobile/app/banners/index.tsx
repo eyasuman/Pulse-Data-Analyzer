@@ -48,6 +48,7 @@ export default function BannersScreen() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = banners
     .filter((b) => activeFilter === "active" ? b.isActive : activeFilter === "inactive" ? !b.isActive : true);
@@ -107,6 +108,28 @@ export default function BannersScreen() {
     }
   };
 
+  const handleToggle = async (banner: Banner) => {
+    setBusyId(banner.id);
+    try {
+      await toggleBanner(banner.id);
+    } catch (error: any) {
+      Alert.alert("Update Failed", error?.message ?? "Could not change banner status.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (banner: Banner) => {
+    setBusyId(banner.id);
+    try {
+      await deleteBanner(banner.id);
+    } catch (error: any) {
+      Alert.alert("Delete Failed", error?.message ?? "Could not delete banner.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.topBar, { paddingTop: topPt, backgroundColor: colors.background }]}>
@@ -145,10 +168,11 @@ export default function BannersScreen() {
           <BannerCard
             banner={item}
             colors={colors}
-            onToggle={() => toggleBanner(item.id)}
+            disabled={busyId === item.id}
+            onToggle={() => handleToggle(item)}
             onDelete={() => Alert.alert("Delete Banner", `Delete "${item.title}"?`, [
               { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: () => deleteBanner(item.id) },
+              { text: "Delete", style: "destructive", onPress: () => handleDelete(item) },
             ])}
           />
         )}
@@ -270,7 +294,7 @@ function ModalField({ label, value, onChangeText, placeholder, colors, multiline
   );
 }
 
-function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; colors: any; onToggle: () => void; onDelete: () => void }) {
+function BannerCard({ banner, colors, disabled, onToggle, onDelete }: { banner: Banner; colors: any; disabled: boolean; onToggle: () => void; onDelete: () => void }) {
   const m = TYPE_META[banner.type] ?? TYPE_META.photo;
   return (
     <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -300,6 +324,7 @@ function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; co
         <Switch
           value={banner.isActive}
           onValueChange={onToggle}
+          disabled={disabled}
           trackColor={{ false: colors.border, true: "#10b98188" }}
           thumbColor={banner.isActive ? "#10b981" : colors.mutedForeground}
           ios_backgroundColor={colors.border}
@@ -321,7 +346,7 @@ function BannerCard({ banner, colors, onToggle, onDelete }: { banner: Banner; co
             </View>
           ) : null}
         </View>
-        <Pressable onPress={onDelete} style={[cardStyles.deleteBtn, { borderColor: "#ef444430" }]}>
+        <Pressable onPress={onDelete} disabled={disabled} style={[cardStyles.deleteBtn, { borderColor: "#ef444430", opacity: disabled ? 0.5 : 1 }]}>
           <Feather name="trash-2" size={12} color="#ef4444" />
         </Pressable>
       </View>

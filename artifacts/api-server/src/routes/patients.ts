@@ -1,13 +1,36 @@
 import { Router } from "express";
-import { sbSelect, sbUpdate } from "../lib/supabase";
-import { writeAudit } from "../lib/audit";
+import { sbSelect } from "../lib/supabase";
 
 const router = Router();
 
 router.get("/patients", async (req, res) => {
   try {
-    const rows = await sbSelect("patients", "?order=createdAt.desc");
-    res.json(rows.map(normalizePatient));
+    const appointments = await sbSelect(
+      "appointments",
+      "?select=patientId,patientName,patientEmail,createdAt&order=createdAt.desc"
+    );
+    const byPatient = new Map<string, any>();
+    for (const appointment of appointments) {
+      const key = appointment.patientId || appointment.patientEmail || appointment.patientName;
+      if (!key) continue;
+      const existing = byPatient.get(key);
+      if (existing) {
+        existing.totalAppointments += 1;
+      } else {
+        byPatient.set(key, {
+          id: appointment.patientId || `email:${appointment.patientEmail || appointment.patientName}`,
+          name: appointment.patientName || "Unknown patient",
+          email: appointment.patientEmail || "",
+          phone: null,
+          city: null,
+          status: "active",
+          totalAppointments: 1,
+          createdAt: appointment.createdAt || new Date().toISOString(),
+          manageable: false,
+        });
+      }
+    }
+    res.json(Array.from(byPatient.values()));
   } catch (err) {
     req.log.error({ err }, "GET /patients failed");
     res.status(500).json({ error: "Internal server error" });
@@ -15,34 +38,9 @@ router.get("/patients", async (req, res) => {
 });
 
 router.patch("/patients/:id/toggle", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [current] = await sbSelect("patients", `?id=eq.${id}`);
-    if (!current) return res.status(404).json({ error: "Not found" });
-    const newStatus = current.status === "active" ? "suspended" : "active";
-    const updated = await sbUpdate("patients", `id=eq.${id}`, { status: newStatus });
-    await writeAudit(
-      `${newStatus === "suspended" ? "suspended" : "reactivated"} patient account for ${current.name}`,
-      "patient"
-    );
-    res.json(normalizePatient(updated));
-  } catch (err) {
-    req.log.error({ err }, "PATCH /patients/:id/toggle failed");
-    res.status(500).json({ error: "Internal server error" });
-  }
+  res.status(409).json({
+    error: "Patient accounts are derived from appointments and cannot be suspended from this database schema.",
+  });
 });
-
-function normalizePatient(row: any) {
-  return {
-    id: row.id,
-    name: row.name ?? "",
-    email: row.email ?? "",
-    phone: row.phone ?? null,
-    city: row.city ?? null,
-    status: row.status ?? "active",
-    totalAppointments: row.totalAppointments ?? row.total_appointments ?? 0,
-    createdAt: row.createdAt ?? new Date().toISOString(),
-  };
-}
 
 export default router;

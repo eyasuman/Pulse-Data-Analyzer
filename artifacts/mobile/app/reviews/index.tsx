@@ -58,7 +58,13 @@ export default function ReviewsScreen() {
       .map((s) => ({
         text: STATUS_META[s].label,
         style: s === "banned" ? "destructive" as const : "default" as const,
-        onPress: () => updateReviewStatus(review.id, s),
+        onPress: async () => {
+          try {
+            await updateReviewStatus(review.id, s);
+          } catch (error: any) {
+            Alert.alert("Update Failed", error?.message ?? "Could not update review.");
+          }
+        },
       }));
     Alert.alert(`Review by ${review.patientName}`, "Change review status:", [
       ...options,

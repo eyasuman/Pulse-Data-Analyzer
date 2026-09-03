@@ -6,7 +6,7 @@ const router = Router();
 
 router.get("/institutes", async (req, res) => {
   try {
-    const rows = await sbSelect("institutes", "?order=createdAt.desc");
+    const rows = await sbSelect("institute_pulse", "?order=createdAt.desc");
     res.json(rows.map(normalizeInstitute));
   } catch (err) {
     req.log.error({ err }, "GET /institutes failed");
@@ -16,7 +16,24 @@ router.get("/institutes", async (req, res) => {
 
 router.post("/institutes", async (req, res) => {
   try {
-    const created = await sbInsert("institutes", { ...req.body });
+    const {
+      name, type, status, city, address, phone, email, licenseNo,
+      totalDoctors, totalBeds, services, accreditations,
+    } = req.body;
+    const created = await sbInsert("institute_pulse", {
+      name,
+      type,
+      status,
+      city,
+      address,
+      phone: phone || null,
+      email: email || null,
+      licenseNo: licenseNo || null,
+      totalDoctors: totalDoctors ?? 0,
+      totalBeds: totalBeds ?? null,
+      services: Array.isArray(services) ? services : [],
+      accreditations: Array.isArray(accreditations) ? accreditations : [],
+    });
     await writeAudit(`added institute "${created.name}" (${created.type})`, "institute");
     res.status(201).json(normalizeInstitute(created));
   } catch (err) {
@@ -31,9 +48,9 @@ router.patch("/institutes/:id/status", async (req, res) => {
   const valid = ["Active", "Pending", "Suspended"];
   if (!valid.includes(status)) return res.status(400).json({ error: "Invalid status" });
   try {
-    const [current] = await sbSelect("institutes", `?id=eq.${id}`);
+    const [current] = await sbSelect("institute_pulse", `?id=eq.${id}`);
     if (!current) return res.status(404).json({ error: "Not found" });
-    const updated = await sbUpdate("institutes", `id=eq.${id}`, { status });
+    const updated = await sbUpdate("institute_pulse", `id=eq.${id}`, { status });
     await writeAudit(`set institute ${current.name} status to ${status}`, "institute");
     res.json(normalizeInstitute(updated));
   } catch (err) {

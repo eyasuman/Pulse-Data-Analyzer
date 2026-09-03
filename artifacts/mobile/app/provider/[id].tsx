@@ -21,17 +21,18 @@ function DetailItem({ icon, label, value, colors }: { icon: any; label: string; 
   return (
     <View style={[detailStyles.item]}>
       <Feather name={icon} size={12} color={colors.mutedForeground} />
-      <View>
+      <View style={detailStyles.copy}>
         <Text style={[detailStyles.label, { color: colors.mutedForeground }]}>{label}</Text>
-        <Text style={[detailStyles.value, { color: colors.foreground }]}>{value}</Text>
+        <Text style={[detailStyles.value, { color: colors.foreground }]} numberOfLines={2}>{value || "—"}</Text>
       </View>
     </View>
   );
 }
 const detailStyles = StyleSheet.create({
-  item: { flexDirection: "row", alignItems: "flex-start", gap: 8, flex: 1 },
+  item: { flexDirection: "row", alignItems: "flex-start", gap: 8, width: "47%", minWidth: 135 },
+  copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
-  value: { fontSize: 12, fontWeight: "500", marginTop: 1, fontFamily: "Inter_500Medium" },
+  value: { fontSize: 12, fontWeight: "500", marginTop: 2, lineHeight: 17, fontFamily: "Inter_500Medium" },
 });
 
 export default function ProviderDetailScreen() {
@@ -67,10 +68,15 @@ export default function ProviderDetailScreen() {
           style: newStatus === "Declined" || newStatus === "Disabled" ? "destructive" : "default",
           onPress: async () => {
             setIsUpdating(true);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await updateDoctorStatus(doctor.id, newStatus);
-            setIsUpdating(false);
-            Alert.alert("Updated", `Provider status set to ${newStatus}.`);
+            try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await updateDoctorStatus(doctor.id, newStatus);
+              Alert.alert("Updated", `Provider status set to ${newStatus}.`);
+            } catch (error: any) {
+              Alert.alert("Update Failed", error?.message ?? "Could not update provider status.");
+            } finally {
+              setIsUpdating(false);
+            }
           },
         },
       ]
@@ -204,7 +210,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 18, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
   specialty: { fontSize: 12, fontFamily: "Inter_400Regular" },
   divider: { height: 1 },
-  detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  detailGrid: { flexDirection: "row", flexWrap: "wrap", columnGap: 14, rowGap: 16 },
   bioLabel: { fontSize: 9, fontWeight: "700", fontFamily: "Inter_700Bold", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 },
   bio: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
   modesCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },

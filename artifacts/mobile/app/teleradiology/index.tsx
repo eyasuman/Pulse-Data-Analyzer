@@ -47,7 +47,13 @@ export default function TeleradiologyScreen() {
       .map((s) => ({
         text: STATUS_META[s].label,
         style: s === "urgent" ? "destructive" as const : "default" as const,
-        onPress: () => updateCaseStatus(c.id, s),
+        onPress: async () => {
+          try {
+            await updateCaseStatus(c.id, s);
+          } catch (error: any) {
+            Alert.alert("Update Failed", error?.message ?? "Could not update case.");
+          }
+        },
       }));
     Alert.alert(`Case ${c.caseId}`, `Assigned to ${c.radiologistName ?? "Unassigned"}`, [
       ...options,
