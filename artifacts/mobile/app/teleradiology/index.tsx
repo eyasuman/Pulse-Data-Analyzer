@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, TeleradiologyCase } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 type CaseStatus = TeleradiologyCase["status"];
 const STATUS_META: Record<CaseStatus, { color: string; icon: any; label: string }> = {
@@ -25,6 +26,8 @@ export default function TeleradiologyScreen() {
   const router = useRouter();
   const { teleradiologyCases, updateCaseStatus } = useData();
   const [filter, setFilter] = useState<CaseStatus | "all">("all");
+  const [actionTarget, setActionTarget] = useState<TeleradiologyCase | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const filtered = useMemo(() => {
     if (filter === "all") return teleradiologyCases;
@@ -41,25 +44,7 @@ export default function TeleradiologyScreen() {
 
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
-  const handleAction = (c: TeleradiologyCase) => {
-    const options = (["pending", "in-review", "completed", "urgent"] as CaseStatus[])
-      .filter((s) => s !== c.status)
-      .map((s) => ({
-        text: STATUS_META[s].label,
-        style: s === "urgent" ? "destructive" as const : "default" as const,
-        onPress: async () => {
-          try {
-            await updateCaseStatus(c.id, s);
-          } catch (error: any) {
-            Alert.alert("Update Failed", error?.message ?? "Could not update case.");
-          }
-        },
-      }));
-    Alert.alert(`Case ${c.caseId}`, `Assigned to ${c.radiologistName ?? "Unassigned"}`, [
-      ...options,
-      { text: "Cancel", style: "cancel" as const },
-    ]);
-  };
+  const handleAction = (c: TeleradiologyCase) => setActionTarget(c);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -111,6 +96,29 @@ export default function TeleradiologyScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<View style={styles.empty}><Feather name="radio" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No cases found</Text></View>}
+      />
+      <ActionModal
+        visible={!!actionTarget}
+        title={actionTarget ? `Case ${actionTarget.caseId}` : ""}
+        message={actionTarget ? `Assigned to ${actionTarget.radiologistName ?? "Unassigned"}` : undefined}
+        options={(actionTarget ? (["pending", "in-review", "completed", "urgent"] as CaseStatus[]).filter((s) => s !== actionTarget.status) : []).map((status) => ({
+          label: STATUS_META[status].label,
+          destructive: status === "urgent",
+          onPress: async () => {
+            try {
+              await updateCaseStatus(actionTarget!.id, status);
+            } catch (error: any) {
+              setNotice({ title: "Update Failed", message: error?.message ?? "Could not update case." });
+            }
+          },
+        }))}
+        onClose={() => setActionTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
     </View>
   );

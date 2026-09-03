@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, Alert, Switch,
+  View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData } from "@/context/DataContext";
+import { NoticeModal } from "@/components/ActionModal";
 
 function SettingSection({ title, icon, colors, children }: any) {
   return (
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
   const [confirmPw, setConfirmPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [changingPw, setChangingPw] = useState(false);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
@@ -53,7 +55,10 @@ export default function SettingsScreen() {
     const feeNum = parseFloat(fee);
     const noticeNum = parseInt(noticePeriod);
     const penaltyNum = parseFloat(penalty);
-    if (isNaN(feeNum) || feeNum < 0 || feeNum > 100) { Alert.alert("Invalid Fee", "Platform fee must be 0–100%."); return; }
+    if (isNaN(feeNum) || feeNum < 0 || feeNum > 100) { setNotice({ title: "Invalid Fee", message: "Platform fee must be 0–100%." }); return; }
+    if (isNaN(noticeNum) || noticeNum < 0) { setNotice({ title: "Invalid Notice Period", message: "Cancellation notice must be zero or more hours." }); return; }
+    if (isNaN(penaltyNum) || penaltyNum < 0) { setNotice({ title: "Invalid Penalty", message: "Cancellation penalty must be zero or more." }); return; }
+    if (!Number.isInteger(timeoutMinutes) || timeoutMinutes < 1) { setNotice({ title: "Invalid Timeout", message: "Inactivity timeout must be at least one minute." }); return; }
     setSaving(true);
     try {
       await updateSettings({
@@ -64,21 +69,21 @@ export default function SettingsScreen() {
         gatewayPassword: settings.gatewayPassword,
         inactivityTimeoutMinutes: timeoutMinutes,
       });
-      Alert.alert("Saved", "Platform settings updated successfully.");
-    } catch { Alert.alert("Error", "Failed to save settings."); }
+      setNotice({ title: "Saved", message: "Platform settings updated successfully." });
+    } catch (error: any) { setNotice({ title: "Error", message: error?.message ?? "Failed to save settings." }); }
     finally { setSaving(false); }
   };
 
   const handleChangePassword = async () => {
-    if (currentPw !== settings.gatewayPassword) { Alert.alert("Incorrect", "Current password does not match."); return; }
-    if (newPw.length < 4) { Alert.alert("Too Short", "New password must be at least 4 characters."); return; }
-    if (newPw !== confirmPw) { Alert.alert("Mismatch", "New password and confirmation do not match."); return; }
+    if (currentPw !== settings.gatewayPassword) { setNotice({ title: "Incorrect", message: "Current password does not match." }); return; }
+    if (newPw.length < 4) { setNotice({ title: "Too Short", message: "New password must be at least 4 characters." }); return; }
+    if (newPw !== confirmPw) { setNotice({ title: "Mismatch", message: "New password and confirmation do not match." }); return; }
     setChangingPw(true);
     try {
       await changeGatewayPassword(newPw);
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
-      Alert.alert("Updated", "Gateway password changed successfully.");
-    } catch { Alert.alert("Error", "Failed to update password."); }
+      setNotice({ title: "Updated", message: "Gateway password changed successfully." });
+    } catch (error: any) { setNotice({ title: "Error", message: error?.message ?? "Failed to update password." }); }
     finally { setChangingPw(false); }
   };
 
@@ -169,6 +174,12 @@ export default function SettingsScreen() {
         <InfoRow label="Reminder Cadence" value={settings.reminderCadence} colors={colors} />
         <InfoRow label="Inactivity Timeout" value={`${settings.inactivityTimeoutMinutes} min`} colors={colors} />
       </View>
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
+      />
     </ScrollView>
   );
 }

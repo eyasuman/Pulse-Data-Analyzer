@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, Review, ReviewStatus } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 const STATUS_FILTERS: Array<ReviewStatus | "all"> = ["all", "visible", "pinned", "banned", "shadow_banned"];
 const STATUS_META: Record<ReviewStatus, { label: string; color: string; icon: any }> = {
@@ -32,6 +33,8 @@ export default function ReviewsScreen() {
   const router = useRouter();
   const { reviews, updateReviewStatus } = useData();
   const [filter, setFilter] = useState<ReviewStatus | "all">("all");
+  const [actionTarget, setActionTarget] = useState<Review | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const filtered = useMemo(() => {
     if (filter === "all") return reviews;
@@ -52,25 +55,7 @@ export default function ReviewsScreen() {
 
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
-  const handleAction = (review: Review) => {
-    const options = (["visible", "pinned", "banned", "shadow_banned"] as ReviewStatus[])
-      .filter((s) => s !== review.status)
-      .map((s) => ({
-        text: STATUS_META[s].label,
-        style: s === "banned" ? "destructive" as const : "default" as const,
-        onPress: async () => {
-          try {
-            await updateReviewStatus(review.id, s);
-          } catch (error: any) {
-            Alert.alert("Update Failed", error?.message ?? "Could not update review.");
-          }
-        },
-      }));
-    Alert.alert(`Review by ${review.patientName}`, "Change review status:", [
-      ...options,
-      { text: "Cancel", style: "cancel" as const },
-    ]);
-  };
+  const handleAction = (review: Review) => setActionTarget(review);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -119,6 +104,29 @@ export default function ReviewsScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<View style={styles.empty}><Feather name="star" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No reviews found</Text></View>}
+      />
+      <ActionModal
+        visible={!!actionTarget}
+        title={actionTarget ? `Review by ${actionTarget.patientName}` : ""}
+        message="Choose a new review status."
+        options={(actionTarget ? (["visible", "pinned", "banned", "shadow_banned"] as ReviewStatus[]).filter((s) => s !== actionTarget.status) : []).map((status) => ({
+          label: STATUS_META[status].label,
+          destructive: status === "banned",
+          onPress: async () => {
+            try {
+              await updateReviewStatus(actionTarget!.id, status);
+            } catch (error: any) {
+              setNotice({ title: "Update Failed", message: error?.message ?? "Could not update review." });
+            }
+          },
+        }))}
+        onClose={() => setActionTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
     </View>
   );

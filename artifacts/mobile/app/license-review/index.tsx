@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, Platform,
   Linking, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useData, Doctor } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 export default function LicenseReviewScreen() {
   const colors = useColors();
@@ -17,6 +18,8 @@ export default function LicenseReviewScreen() {
   const { doctors, verifyDoctorLicense, getDoctorLicenseUrl } = useData();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [verifyTarget, setVerifyTarget] = useState<{ doctor: Doctor; approved: boolean } | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   // Doctors with a licenseFile uploaded but not yet Active
   const pending = useMemo(
@@ -35,10 +38,10 @@ export default function LicenseReviewScreen() {
       if (canOpen) {
         await Linking.openURL(signedUrl);
       } else {
-        Alert.alert("Cannot Open", `Copy this URL to view:\n${signedUrl}`);
+        setNotice({ title: "Cannot Open", message: `Copy this URL to view:\n${signedUrl}` });
       }
     } catch (err: any) {
-      Alert.alert("Error", err?.message ?? "Could not fetch license URL.");
+      setNotice({ title: "Error", message: err?.message ?? "Could not fetch license URL." });
     } finally {
       setViewingId(null);
     }
@@ -46,33 +49,25 @@ export default function LicenseReviewScreen() {
 
   const handleVerify = (doctor: Doctor, approved: boolean) => {
     if (loadingId) return;
-    Alert.alert(
-      approved ? "Approve License" : "Reject License",
-      `${approved ? "Approve" : "Reject"} ${doctor.name}'s license?\n\n${approved ? "Their provider account will be activated." : "Their account will be set to Declined."}`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: approved ? "Approve" : "Reject",
-          style: approved ? "default" : "destructive",
-          onPress: async () => {
-            if (loadingId) return;
-            setLoadingId(doctor.id);
-            try {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await verifyDoctorLicense(doctor.id, approved);
-              Alert.alert(
-                approved ? "✓ Approved" : "Rejected",
-                `${doctor.name} has been ${approved ? "activated as a provider" : "declined"}.`
-              );
-            } catch (err: any) {
-              Alert.alert("Action Failed", err?.message ?? "Could not update the license. Please try again.");
-            } finally {
-              setLoadingId(null);
-            }
-          },
-        },
-      ]
-    );
+    setVerifyTarget({ doctor, approved });
+  };
+
+  const performVerify = async () => {
+    if (!verifyTarget || loadingId) return;
+    const { doctor, approved } = verifyTarget;
+    setLoadingId(doctor.id);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await verifyDoctorLicense(doctor.id, approved);
+      setNotice({
+        title: approved ? "Approved" : "Rejected",
+        message: `${doctor.name} has been ${approved ? "activated as a provider" : "declined"}.`,
+      });
+    } catch (err: any) {
+      setNotice({ title: "Action Failed", message: err?.message ?? "Could not update the license. Please try again." });
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
@@ -129,6 +124,23 @@ export default function LicenseReviewScreen() {
             </Text>
           </View>
         }
+      />
+      <ActionModal
+        visible={!!verifyTarget}
+        title={verifyTarget?.approved ? "Approve License" : "Reject License"}
+        message={verifyTarget ? `${verifyTarget.approved ? "Approve" : "Reject"} ${verifyTarget.doctor.name}'s license?\n\n${verifyTarget.approved ? "Their provider account will be activated." : "Their account will be set to Declined."}` : undefined}
+        options={verifyTarget ? [{
+          label: verifyTarget.approved ? "Approve" : "Reject",
+          destructive: !verifyTarget.approved,
+          onPress: performVerify,
+        }] : []}
+        onClose={() => setVerifyTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
     </View>
   );

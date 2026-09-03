@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, Platform,
   Image, ActivityIndicator, Modal, ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useData, Appointment, PaymentStatus } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 const PAYMENT_STATUS_META: Record<string, { color: string; icon: any; label: string }> = {
   pending: { color: "#f59e0b", icon: "clock", label: "PENDING" },
@@ -24,6 +25,8 @@ export default function PaymentReviewScreen() {
   const [filter, setFilter] = useState<PaymentStatus | "all">("pending");
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [actionTarget, setActionTarget] = useState<{ appointment: Appointment; status: PaymentStatus } | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   // Only show appointments that have a paymentProofUrl (payment was submitted)
   const withProof = useMemo(
@@ -47,33 +50,22 @@ export default function PaymentReviewScreen() {
 
   const handleAction = (appt: Appointment, status: PaymentStatus) => {
     const isVerify = status === "verified";
-    Alert.alert(
-      isVerify ? "Verify Payment" : "Reject Payment",
-      `${isVerify ? "Verify" : "Reject"} payment for ${appt.patientName}?\n\n${
-        isVerify
-          ? "This will unlock the patient's video consultation screen in real time."
-          : "The patient will be notified their payment was rejected."
-      }`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: isVerify ? "Verify" : "Reject",
-          style: isVerify ? "default" : "destructive",
-          onPress: async () => {
-            setLoadingId(appt.id);
-            setSelectedAppt(null);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            try {
-              await updatePaymentStatus(appt.id, status);
-            } catch (err: any) {
-              Alert.alert("Error", err?.message ?? "Update failed.");
-            } finally {
-              setLoadingId(null);
-            }
-          },
-        },
-      ]
-    );
+    setActionTarget({ appointment: appt, status });
+  };
+
+  const performAction = async () => {
+    if (!actionTarget || loadingId) return;
+    const { appointment, status } = actionTarget;
+    setLoadingId(appointment.id);
+    setSelectedAppt(null);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await updatePaymentStatus(appointment.id, status);
+    } catch (err: any) {
+      setNotice({ title: "Error", message: err?.message ?? "Update failed." });
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
@@ -157,6 +149,24 @@ export default function PaymentReviewScreen() {
             </Text>
           </View>
         }
+      />
+
+      <ActionModal
+        visible={!!actionTarget}
+        title={actionTarget?.status === "verified" ? "Verify Payment" : "Reject Payment"}
+        message={actionTarget ? `${actionTarget.status === "verified" ? "Verify" : "Reject"} payment for ${actionTarget.appointment.patientName}?\n\n${actionTarget.status === "verified" ? "This will unlock the patient's video consultation screen in real time." : "The patient will be notified their payment was rejected."}` : undefined}
+        options={actionTarget ? [{
+          label: actionTarget.status === "verified" ? "Verify" : "Reject",
+          destructive: actionTarget.status === "rejected",
+          onPress: performAction,
+        }] : []}
+        onClose={() => setActionTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
 
       {/* Proof image modal */}

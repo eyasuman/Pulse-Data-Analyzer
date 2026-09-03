@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, TextInput, Platform, Alert,
+  View, Text, StyleSheet, FlatList, Pressable, TextInput, Platform,
   Modal, ScrollView, KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, Institute, InstituteStatus, InstituteType } from "@/context/DataContext";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 const TYPE_ICONS: Record<InstituteType, any> = {
   Hospital: "activity", Clinic: "user", "Diagnostic Center": "search",
@@ -31,6 +32,8 @@ export default function InstitutesScreen() {
   const [form, setForm] = useState({ name: "", type: "Hospital" as InstituteType, city: "", address: "", phone: "", email: "", licenseNo: "" });
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [statusMenu, setStatusMenu] = useState<{ id: string; name: string; statuses: InstituteStatus[] } | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const filtered = useMemo(() => {
     let result = institutes;
@@ -51,13 +54,13 @@ export default function InstitutesScreen() {
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
   const handleAdd = async () => {
-    if (!form.name.trim() || !form.city.trim()) { Alert.alert("Required", "Name and city are required."); return; }
+    if (!form.name.trim() || !form.city.trim()) { setNotice({ title: "Required", message: "Name and city are required." }); return; }
     setSaving(true);
     try {
       await addInstitute({ ...form, status: "Pending", totalDoctors: 0, services: [] });
       setShowAddModal(false);
       setForm({ name: "", type: "Hospital", city: "", address: "", phone: "", email: "", licenseNo: "" });
-    } catch { Alert.alert("Error", "Failed to add institute."); }
+    } catch (error: any) { setNotice({ title: "Error", message: error?.message ?? "Failed to add institute." }); }
     finally { setSaving(false); }
   };
 
@@ -65,9 +68,9 @@ export default function InstitutesScreen() {
     setUpdatingId(id);
     try {
       await updateInstituteStatus(id, status);
-      Alert.alert("Updated", `Institute status set to ${status}.`);
+      setNotice({ title: "Updated", message: `Institute status set to ${status}.` });
     } catch (error: any) {
-      Alert.alert("Update Failed", error?.message ?? "Could not update institute status.");
+      setNotice({ title: "Update Failed", message: error?.message ?? "Could not update institute status." });
     } finally {
       setUpdatingId(null);
     }
@@ -109,16 +112,38 @@ export default function InstitutesScreen() {
         data={filtered}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <InstituteCard institute={item} colors={colors} disabled={updatingId === item.id} onStatusChange={(s) =>
-            Alert.alert("Change Status", `Set ${item.name} to ${s}?`, [
-              { text: "Cancel", style: "cancel" },
-              { text: "Confirm", onPress: () => handleStatusChange(item.id, s) },
-            ])
-          } />
+          <InstituteCard
+            institute={item}
+            colors={colors}
+            disabled={updatingId === item.id}
+            onOpenStatusMenu={() => setStatusMenu({
+              id: item.id,
+              name: item.name,
+              statuses: (["Active", "Pending", "Suspended"] as InstituteStatus[]).filter((s) => s !== item.status),
+            })}
+          />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<View style={styles.empty}><Feather name="grid" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No institutes found</Text></View>}
+      />
+
+      <ActionModal
+        visible={!!statusMenu}
+        title="Change Institute Status"
+        message={statusMenu ? `Choose a new status for ${statusMenu.name}.` : undefined}
+        options={(statusMenu?.statuses ?? []).map((status) => ({
+          label: status,
+          destructive: status === "Suspended",
+          onPress: () => handleStatusChange(statusMenu!.id, status),
+        }))}
+        onClose={() => setStatusMenu(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
       />
 
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)}>
@@ -175,7 +200,7 @@ function FieldInput({ label, value, onChangeText, placeholder, colors, keyboardT
   );
 }
 
-function InstituteCard({ institute, colors, disabled, onStatusChange }: { institute: Institute; colors: any; disabled: boolean; onStatusChange: (s: InstituteStatus) => void }) {
+function InstituteCard({ institute, colors, disabled, onOpenStatusMenu }: { institute: Institute; colors: any; disabled: boolean; onOpenStatusMenu: () => void }) {
   const statusColor = STATUS_COLORS[institute.status] ?? "#94a3b8";
   const nextStatuses = (["Active", "Pending", "Suspended"] as InstituteStatus[]).filter(s => s !== institute.status);
   return (
@@ -197,7 +222,7 @@ function InstituteCard({ institute, colors, disabled, onStatusChange }: { instit
           <View style={[cardStyles.statusBadge, { backgroundColor: statusColor + "15", borderColor: statusColor + "30" }]}>
             <Text style={[cardStyles.statusText, { color: statusColor }]}>{institute.status.toUpperCase()}</Text>
           </View>
-          <Pressable disabled={disabled} onPress={() => Alert.alert("Change Status", `${institute.name}`, nextStatuses.map(s => ({ text: s, onPress: () => onStatusChange(s) })).concat([{ text: "Cancel", style: "cancel" } as any]))} style={{ opacity: disabled ? 0.5 : 1 }}>
+          <Pressable accessibilityRole="button" disabled={disabled} onPress={onOpenStatusMenu} style={{ opacity: disabled ? 0.5 : 1 }}>
             <Feather name="more-horizontal" size={14} color={colors.mutedForeground} />
           </Pressable>
         </View>

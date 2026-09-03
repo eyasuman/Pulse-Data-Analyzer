@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform,
+  View, Text, StyleSheet, ScrollView, Pressable, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useData, DoctorStatus } from "@/context/DataContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ActionModal, NoticeModal } from "@/components/ActionModal";
 
 const STATUS_ACTIONS: Array<{ status: DoctorStatus; color: string; label: string }> = [
   { status: "Active", color: "#10b981", label: "Activate" },
@@ -42,6 +43,8 @@ export default function ProviderDetailScreen() {
   const router = useRouter();
   const { doctors, updateDoctorStatus } = useData();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<DoctorStatus | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const doctor = doctors.find((d) => d.id === id);
 
@@ -57,30 +60,21 @@ export default function ProviderDetailScreen() {
     );
   }
 
-  const handleStatusChange = (newStatus: DoctorStatus) => {
-    Alert.alert(
-      `${newStatus} Provider`,
-      `Are you sure you want to set ${doctor.name} to ${newStatus}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          style: newStatus === "Declined" || newStatus === "Disabled" ? "destructive" : "default",
-          onPress: async () => {
-            setIsUpdating(true);
-            try {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await updateDoctorStatus(doctor.id, newStatus);
-              Alert.alert("Updated", `Provider status set to ${newStatus}.`);
-            } catch (error: any) {
-              Alert.alert("Update Failed", error?.message ?? "Could not update provider status.");
-            } finally {
-              setIsUpdating(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleStatusChange = (newStatus: DoctorStatus) => setStatusTarget(newStatus);
+
+  const performStatusChange = async () => {
+    if (!statusTarget || isUpdating) return;
+    const newStatus = statusTarget;
+    setIsUpdating(true);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await updateDoctorStatus(doctor.id, newStatus);
+      setNotice({ title: "Updated", message: `Provider status set to ${newStatus}.` });
+    } catch (error: any) {
+      setNotice({ title: "Update Failed", message: error?.message ?? "Could not update provider status." });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
@@ -179,6 +173,23 @@ export default function ProviderDetailScreen() {
         </Text>
         <Text style={[styles.metaItem, { color: colors.mutedForeground }]}>ID: {doctor.id}</Text>
       </View>
+      <ActionModal
+        visible={!!statusTarget}
+        title={statusTarget ? `${statusTarget} Provider` : ""}
+        message={statusTarget ? `Are you sure you want to set ${doctor.name} to ${statusTarget}?` : undefined}
+        options={statusTarget ? [{
+          label: "Confirm",
+          destructive: statusTarget === "Declined" || statusTarget === "Disabled",
+          onPress: performStatusChange,
+        }] : []}
+        onClose={() => setStatusTarget(null)}
+      />
+      <NoticeModal
+        visible={!!notice}
+        title={notice?.title ?? ""}
+        message={notice?.message ?? ""}
+        onClose={() => setNotice(null)}
+      />
     </ScrollView>
   );
 }
