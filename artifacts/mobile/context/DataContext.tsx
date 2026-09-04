@@ -161,9 +161,12 @@ function getApiBase(): string {
     const apiHost = h.replace(".expo.janeway.replit.dev", ".janeway.replit.dev");
     return `https://${apiHost}/api`;
   }
-  const explicitApiUrl = process.env["EXPO_PUBLIC_API_URL"];
+  // Expo statically inlines EXPO_PUBLIC_* variables only when accessed with
+  // dot notation. Bracket notation leaves production native builds without
+  // an API URL, causing every request to fail before reaching the server.
+  const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (explicitApiUrl) return explicitApiUrl.replace(/\/$/, "");
-  const domain = process.env["EXPO_PUBLIC_DOMAIN"];
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}/api`;
   throw new Error("Production API URL is not configured for this build.");
 }
