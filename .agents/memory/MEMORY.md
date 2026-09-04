@@ -1,1 +1,2 @@
 - [Nested Expo EAS builds](nested-expo-eas-builds.md) — launch EAS from the mobile artifact; root launch uploads the non-Expo workspace and fails during dependency install.
+- [Nested pnpm package installs](nested-pnpm-package-installs.md) — package installs for an artifact need an explicit workspace filter; root-only helpers cannot target nested packages.
