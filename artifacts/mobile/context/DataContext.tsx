@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { Platform } from "react-native";
 
 export type DoctorStatus = "Pending" | "Active" | "Disabled" | "Declined";
 export type ProviderType = "Doctor" | "Nurse" | "Home Care" | "Physiotherapist" | "Healthcare Facility";
@@ -155,7 +156,7 @@ export interface PlatformSettings {
 // ─── API fetch ────────────────────────────────────────────────────────────────
 
 function getApiBase(): string {
-  if (typeof window !== "undefined" && window.location?.hostname) {
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.hostname) {
     const h = window.location.hostname;
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost/api";
     const apiHost = h.replace(".expo.janeway.replit.dev", ".janeway.replit.dev");
