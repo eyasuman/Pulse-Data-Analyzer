@@ -236,7 +236,12 @@ interface DataContextValue {
   /** Approve (true) or reject (false) a doctor's uploaded license */
   verifyDoctorLicense: (id: string, approved: boolean) => Promise<void>;
   /** Get a short-lived signed URL for a doctor's private license file */
-  getDoctorLicenseUrl: (id: string) => Promise<{ signedUrl: string; fileName: string }>;
+  getDoctorLicenseUrl: (id: string) => Promise<{
+    signedUrl: string;
+    fileName: string;
+    mimeType?: string;
+    size?: number;
+  }>;
 
   // Institutes
   addInstitute: (data: Omit<Institute, "id" | "createdAt">) => Promise<void>;
@@ -381,7 +386,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getDoctorLicenseUrl = async (id: string) => {
-    return apiFetch<{ signedUrl: string; fileName: string }>(`/providers/${id}/license-url`);
+    return apiFetch<{
+      signedUrl: string;
+      fileName: string;
+      mimeType?: string;
+      size?: number;
+    }>(`/providers/${id}/license-url`);
   };
 
   // ── Institutes ─────────────────────────────────────────────────────────────

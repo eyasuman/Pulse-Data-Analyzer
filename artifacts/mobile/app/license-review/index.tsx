@@ -156,6 +156,13 @@ export default function LicenseReviewScreen() {
   );
 }
 
+function formatFileSize(bytes?: number): string | null {
+  if (!bytes || bytes <= 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function LicenseCard({
   doctor, colors, isLoading, isViewing, onView, getLicenseUrl, onOpenUrl, onApprove, onReject,
 }: {
@@ -164,7 +171,12 @@ function LicenseCard({
   isLoading: boolean;
   isViewing: boolean;
   onView: () => void;
-  getLicenseUrl: (id: string) => Promise<{ signedUrl: string; fileName: string }>;
+  getLicenseUrl: (id: string) => Promise<{
+    signedUrl: string;
+    fileName: string;
+    mimeType?: string;
+    size?: number;
+  }>;
   onOpenUrl: (url: string) => Promise<void>;
   onApprove: () => void;
   onReject: () => void;
@@ -173,6 +185,8 @@ function LicenseCard({
   const lf = doctor.licenseFile;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewFileName, setPreviewFileName] = useState(lf?.name ?? "license");
+  const [previewMimeType, setPreviewMimeType] = useState(lf?.type ?? "");
+  const [previewSize, setPreviewSize] = useState(lf?.size);
   const [previewLoading, setPreviewLoading] = useState(!!lf);
   const [previewFailed, setPreviewFailed] = useState(false);
   const fetchKeyRef = useRef<string | null>(null);
@@ -186,10 +200,12 @@ function LicenseCard({
     setPreviewLoading(true);
     setPreviewFailed(false);
     getLicenseUrl(doctor.id)
-      .then(({ signedUrl, fileName }) => {
+      .then(({ signedUrl, fileName, mimeType, size }) => {
         if (!active) return;
         setPreviewUrl(signedUrl);
         setPreviewFileName(fileName || lf.name || "license");
+        setPreviewMimeType(mimeType || lf.type || "");
+        setPreviewSize(size ?? lf.size);
       })
       .catch(() => {
         if (active) setPreviewFailed(true);
@@ -202,12 +218,12 @@ function LicenseCard({
     };
   }, [doctor.id, lf?.path, lf?.name]);
 
-  const fileType = (lf?.type ?? "").toLowerCase();
+  const fileType = previewMimeType.toLowerCase();
   const fileName = previewFileName || lf?.name || "license";
   const isPdf = fileType === "application/pdf" || /\.pdf$/i.test(fileName);
   const isImage = fileType.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(fileName);
   const supportsInlinePreview = !!previewUrl && !previewFailed && (isImage || (isPdf && Platform.OS === "web"));
-  const fileSize = formatFileSize(lf?.size);
+  const fileSize = formatFileSize(previewSize);
 
   return (
     <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -236,7 +252,7 @@ function LicenseCard({
             <View style={cardStyles.fileMeta}>
               <Text numberOfLines={2} style={[cardStyles.fileName, { color: colors.foreground }]}>{fileName}</Text>
               <Text style={[cardStyles.fileType, { color: colors.mutedForeground }]}>
-                {lf.type || "Unknown file"}{fileSize ? ` · ${fileSize}` : ""} · Private bucket
+                {previewMimeType || "Unknown file"}{fileSize ? ` · ${fileSize}` : ""} · Private bucket
               </Text>
             </View>
             {previewUrl && (

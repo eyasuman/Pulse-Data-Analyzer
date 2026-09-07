@@ -62,7 +62,13 @@ router.get("/providers/:id/license-url", async (req, res) => {
   try {
     const [doctor] = await sbSelect("doctors", `?id=eq.${id}`);
     if (!doctor) return res.status(404).json({ error: "Not found" });
-    const licenseFile = doctor.licenseFile as { path?: string; name?: string; uploadId?: string } | string | null;
+    const licenseFile = doctor.licenseFile as {
+      path?: string;
+      name?: string;
+      type?: string;
+      size?: number;
+      uploadId?: string;
+    } | string | null;
     const uploadId =
       (typeof licenseFile === "object" ? licenseFile?.uploadId : null)
       ?? doctor.licenseUploadId
@@ -71,16 +77,20 @@ router.get("/providers/:id/license-url", async (req, res) => {
     let bucket = "medical-licenses";
     let path = typeof licenseFile === "string" ? licenseFile : licenseFile?.path;
     let fileName = typeof licenseFile === "object" ? licenseFile?.name : undefined;
+    let mimeType = typeof licenseFile === "object" ? licenseFile?.type : undefined;
+    let size = typeof licenseFile === "object" ? licenseFile?.size : undefined;
 
     if (uploadId) {
       const [upload] = await sbSelect(
         "user_uploads",
-        `?id=eq.${encodeURIComponent(uploadId)}&status=eq.active&select=bucket,storage_path,original_name`
+        `?id=eq.${encodeURIComponent(uploadId)}&status=eq.active&select=bucket,storage_path,original_name,mime_type,size_bytes`
       );
       if (upload?.storage_path) {
         bucket = upload.bucket || "user-uploads";
         path = upload.storage_path;
         fileName = upload.original_name || fileName;
+        mimeType = upload.mime_type || mimeType;
+        size = upload.size_bytes ?? size;
       }
     }
 
@@ -88,7 +98,7 @@ router.get("/providers/:id/license-url", async (req, res) => {
       return res.status(404).json({ error: "No license file uploaded" });
     }
     const signedUrl = await sbSignedUrl(bucket, path, 600);
-    res.json({ signedUrl, fileName: fileName ?? "license" });
+    res.json({ signedUrl, fileName: fileName ?? "license", mimeType, size });
   } catch (err) {
     req.log.error({ err }, "GET /providers/:id/license-url failed");
     res.status(500).json({ error: "Internal server error" });
