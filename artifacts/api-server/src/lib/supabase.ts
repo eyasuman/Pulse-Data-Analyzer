@@ -117,9 +117,12 @@ export async function sbSignedUrl(
     throw new Error(`Signed URL ${bucket}/${path} → ${res.status}: ${body}`);
   }
   const json: any = await res.json();
-  // Response: { signedURL: "/storage/v1/object/sign/..." }
+  // Supabase may return either "/object/sign/..." or
+  // "/storage/v1/object/sign/...". Normalize both response shapes.
   const rel: string = json.signedURL ?? json.signedUrl ?? "";
-  return rel.startsWith("http") ? rel : `${SUPABASE_URL}${rel}`;
+  if (rel.startsWith("http")) return rel;
+  if (rel.startsWith("/storage/v1/")) return `${SUPABASE_URL}${rel}`;
+  return `${STORAGE_BASE}${rel.startsWith("/") ? rel : `/${rel}`}`;
 }
 
 /**
