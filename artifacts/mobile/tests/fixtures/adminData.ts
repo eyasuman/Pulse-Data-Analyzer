@@ -134,6 +134,7 @@ export function createSeededAdminData() {
       inactivityTimeoutMinutes: 5,
     },
     isLoading: false,
+    connectionError: null,
     updateDoctorStatus: async () => undefined,
     verifyDoctorLicense: async () => undefined,
     getDoctorLicenseUrl: async () => ({ signedUrl: "https://example.test/license.pdf", fileName: "license.pdf" }),

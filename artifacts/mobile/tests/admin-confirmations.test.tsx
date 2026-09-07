@@ -57,6 +57,40 @@ describe("seeded admin confirmations", () => {
         ["/(tabs)/revenue"],
       ]);
     });
+
+    it("shows a retryable warning when live data is unavailable", async () => {
+      const refresh = jest.fn().mockResolvedValue(undefined);
+      renderAdminScreen(DashboardScreen, {
+        connectionError: "We couldn't load live data. Check your connection and try again.",
+        refresh,
+      });
+
+      expect(screen.getByTestId("dashboard-connection-warning")).toBeTruthy();
+      expect(screen.getByText("Connection issue")).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId("dashboard-retry"));
+        await Promise.resolve();
+      });
+
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not show a connection warning for healthy empty data", () => {
+      renderAdminScreen(DashboardScreen, {
+        doctors: [],
+        appointments: [],
+        institutes: [],
+        banners: [],
+        reviews: [],
+        patients: [],
+        teleradiologyCases: [],
+        connectionError: null,
+      });
+
+      expect(screen.queryByTestId("dashboard-connection-warning")).toBeNull();
+      expect(screen.getByTestId("dashboard-stat-active-providers")).toBeTruthy();
+    });
   });
 
   describe("license review", () => {

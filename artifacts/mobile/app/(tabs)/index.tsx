@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, RefreshControl, Platform, Pressable,
+  View, Text, StyleSheet, ScrollView, RefreshControl, Platform, Pressable, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -29,7 +29,10 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const data = useData();
-  const { doctors, appointments, revenue, institutes, banners, reviews, patients, teleradiologyCases, settings, refresh } = data;
+  const {
+    doctors, appointments, revenue, institutes, banners, reviews, patients,
+    teleradiologyCases, settings, connectionError, refresh,
+  } = data;
   const [refreshing, setRefreshing] = React.useState(false);
 
   const stats = useMemo(() => {
@@ -69,6 +72,39 @@ export default function DashboardScreen() {
           <Text style={[styles.liveText, { color: "#10b981" }]}>LIVE</Text>
         </View>
       </View>
+
+      {connectionError && (
+        <View
+          testID="dashboard-connection-warning"
+          style={[
+            styles.connectionWarning,
+            { backgroundColor: colors.warning + "18", borderColor: colors.warning + "50" },
+          ]}
+        >
+          <Feather name="wifi-off" size={18} color={colors.warning} />
+          <View style={styles.connectionCopy}>
+            <Text style={[styles.connectionTitle, { color: colors.foreground }]}>Connection issue</Text>
+            <Text style={[styles.connectionMessage, { color: colors.mutedForeground }]}>{connectionError}</Text>
+          </View>
+          <Pressable
+            testID="dashboard-retry"
+            accessibilityRole="button"
+            accessibilityLabel="Retry connection"
+            onPress={onRefresh}
+            disabled={refreshing}
+            style={({ pressed }) => [styles.retryButton, { borderColor: colors.warning, opacity: pressed || refreshing ? 0.65 : 1 }]}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.warning} />
+            ) : (
+              <>
+                <Feather name="refresh-cw" size={14} color={colors.warning} />
+                <Text style={[styles.retryText, { color: colors.warning }]}>Retry</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      )}
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
@@ -184,6 +220,12 @@ const styles = StyleSheet.create({
   liveBadge: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, marginTop: 4 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#10b981" },
   liveText: { fontSize: 9, fontWeight: "700", letterSpacing: 1, fontFamily: "Inter_700Bold" },
+  connectionWarning: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, padding: 12 },
+  connectionCopy: { flex: 1, gap: 3 },
+  connectionTitle: { fontSize: 13, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  connectionMessage: { fontSize: 11, lineHeight: 16, fontFamily: "Inter_400Regular" },
+  retryButton: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 7 },
+  retryText: { fontSize: 11, fontWeight: "700", fontFamily: "Inter_700Bold" },
   statsGrid: { gap: 10 },
   row: { flexDirection: "row", gap: 10 },
   alertCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, padding: 10 },

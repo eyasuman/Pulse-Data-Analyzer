@@ -185,12 +185,17 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json();
 }
 
-async function safeApiFetch<T>(path: string, fallback: T): Promise<T> {
+interface SafeApiResult<T> {
+  data: T;
+  error: unknown | null;
+}
+
+async function safeApiFetch<T>(path: string, fallback: T): Promise<SafeApiResult<T>> {
   try {
-    return await apiFetch<T>(path);
+    return { data: await apiFetch<T>(path), error: null };
   } catch (error) {
-    console.warn(`Optional API resource ${path} is unavailable:`, error);
-    return fallback;
+    console.warn(`API resource ${path} is unavailable:`, error);
+    return { data: fallback, error };
   }
 }
 
@@ -208,6 +213,7 @@ interface DataContextValue {
   teleradiologyCases: TeleradiologyCase[];
   settings: PlatformSettings;
   isLoading: boolean;
+  connectionError: string | null;
 
   // Providers
   updateDoctorStatus: (id: string, status: DoctorStatus) => Promise<void>;
@@ -270,11 +276,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [teleradiologyCases, setTeleradiologyCases] = useState<TeleradiologyCase[]>([]);
   const [settings, setSettings] = useState<PlatformSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [
-      doctorsData, appointmentsData, revenueData, institutesData,
-      bannersData, reviewsData, patientsData, auditData, teleData, settingsData,
+      doctorsResult, appointmentsResult, revenueResult, institutesResult,
+      bannersResult, reviewsResult, patientsResult, auditResult, teleResult, settingsResult,
     ] = await Promise.all([
       safeApiFetch<Doctor[]>("/providers", []),
       safeApiFetch<Appointment[]>("/appointments", []),
@@ -287,16 +294,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
       safeApiFetch<TeleradiologyCase[]>("/teleradiology", []),
       safeApiFetch<PlatformSettings>("/settings", DEFAULT_SETTINGS),
     ]);
-    setDoctors(doctorsData);
-    setAppointments(appointmentsData);
-    setRevenue(revenueData);
-    setInstitutes(institutesData);
-    setBanners(bannersData);
-    setReviews(reviewsData);
-    setPatients(patientsData);
-    setAuditLogs(auditData);
-    setTeleradiologyCases(teleData);
-    const { id: _id, ...settingsOnly } = settingsData as PlatformSettings & { id?: string };
+
+    const results = [
+      doctorsResult, appointmentsResult, revenueResult, institutesResult,
+      bannersResult, reviewsResult, patientsResult, auditResult, teleResult, settingsResult,
+    ];
+    setConnectionError(
+      results.some((result) => result.error)
+        ? "We couldn't load live data. Check your connection and try again."
+        : null,
+    );
+
+    setDoctors(doctorsResult.data);
+    setAppointments(appointmentsResult.data);
+    setRevenue(revenueResult.data);
+    setInstitutes(institutesResult.data);
+    setBanners(bannersResult.data);
+    setReviews(reviewsResult.data);
+    setPatients(patientsResult.data);
+    setAuditLogs(auditResult.data);
+    setTeleradiologyCases(teleResult.data);
+    const { id: _id, ...settingsOnly } = settingsResult.data as PlatformSettings & { id?: string };
     setSettings(settingsOnly);
   }, []);
 
@@ -420,7 +438,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       doctors, appointments, revenue, institutes, banners, reviews,
-      patients, auditLogs, teleradiologyCases, settings, isLoading,
+      patients, auditLogs, teleradiologyCases, settings, isLoading, connectionError,
       updateDoctorStatus, verifyDoctorLicense, getDoctorLicenseUrl,
       addInstitute, updateInstituteStatus,
       addBanner, toggleBanner, deleteBanner, uploadBannerImage,
