@@ -10,6 +10,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppState, AppStateStatus, Platform, View, ActivityIndicator } from "react-native";
 
+import "@/lib/supabase";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DataProvider, useData } from "@/context/DataContext";
 import GatewayScreen from "@/components/GatewayScreen";

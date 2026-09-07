@@ -6,19 +6,24 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qxdqubzymuqgppwlzbsc.supabase.co"
+      }
     },
     "preview": {
       "distribution": "internal",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api"
+        "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qxdqubzymuqgppwlzbsc.supabase.co"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api"
+        "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qxdqubzymuqgppwlzbsc.supabase.co"
       }
     }
   },
