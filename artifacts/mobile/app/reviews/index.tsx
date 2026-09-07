@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, Review, ReviewStatus } from "@/context/DataContext";
 import { ActionModal, NoticeModal } from "@/components/ActionModal";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 const STATUS_FILTERS: Array<ReviewStatus | "all"> = ["all", "visible", "pinned", "banned", "shadow_banned"];
 const STATUS_META: Record<ReviewStatus, { label: string; color: string; icon: any }> = {
@@ -31,7 +32,7 @@ export default function ReviewsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { reviews, updateReviewStatus } = useData();
+  const { reviews, updateReviewStatus, connectionErrors, refresh } = useData();
   const [filter, setFilter] = useState<ReviewStatus | "all">("all");
   const [actionTarget, setActionTarget] = useState<Review | null>(null);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
@@ -103,7 +104,21 @@ export default function ReviewsScreen() {
         renderItem={({ item }) => <ReviewCard review={item} colors={colors} onAction={() => handleAction(item)} />}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<View style={styles.empty}><Feather name="star" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No reviews found</Text></View>}
+        ListEmptyComponent={
+          connectionErrors.reviews ? (
+            <ConnectionWarning
+              message={connectionErrors.reviews}
+              onRetry={refresh}
+              testID="reviews-connection-warning"
+              retryTestID="reviews-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="star" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No reviews found</Text>
+            </View>
+          )
+        }
       />
       <ActionModal
         visible={!!actionTarget}

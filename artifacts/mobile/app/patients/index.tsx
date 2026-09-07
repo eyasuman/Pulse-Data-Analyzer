@@ -7,12 +7,13 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, Patient } from "@/context/DataContext";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 export default function PatientsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { patients } = useData();
+  const { patients, connectionErrors, refresh } = useData();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "suspended">("all");
 
@@ -77,7 +78,21 @@ export default function PatientsScreen() {
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<View style={styles.empty}><Feather name="users" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No patients found</Text></View>}
+        ListEmptyComponent={
+          connectionErrors.patients ? (
+            <ConnectionWarning
+              message={connectionErrors.patients}
+              onRetry={refresh}
+              testID="patients-connection-warning"
+              retryTestID="patients-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="users" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No patients found</Text>
+            </View>
+          )
+        }
       />
     </View>
   );

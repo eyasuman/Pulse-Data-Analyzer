@@ -11,6 +11,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
 import { useData, Banner } from "@/context/DataContext";
 import { ActionModal, NoticeModal } from "@/components/ActionModal";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 const TYPE_META: Record<string, { color: string; icon: any; label: string }> = {
   photo: { color: "#818cf8", icon: "image", label: "Photo" },
@@ -43,7 +44,7 @@ export default function BannersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { banners, addBanner, toggleBanner, deleteBanner, uploadBannerImage } = useData();
+  const { banners, addBanner, toggleBanner, deleteBanner, uploadBannerImage, connectionErrors, refresh } = useData();
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -180,14 +181,23 @@ export default function BannersScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="image" size={32} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No banners found</Text>
-            <Pressable onPress={() => setShowAddModal(true)} style={[styles.emptyBtn, { backgroundColor: colors.primary }]}>
-              <Feather name="plus" size={14} color="#fff" />
-              <Text style={styles.emptyBtnText}>Add Banner</Text>
-            </Pressable>
-          </View>
+          connectionErrors.banners ? (
+            <ConnectionWarning
+              message={connectionErrors.banners}
+              onRetry={refresh}
+              testID="banners-connection-warning"
+              retryTestID="banners-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="image" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No banners found</Text>
+              <Pressable onPress={() => setShowAddModal(true)} style={[styles.emptyBtn, { backgroundColor: colors.primary }]}>
+                <Feather name="plus" size={14} color="#fff" />
+                <Text style={styles.emptyBtnText}>Add Banner</Text>
+              </Pressable>
+            </View>
+          )
         }
       />
 

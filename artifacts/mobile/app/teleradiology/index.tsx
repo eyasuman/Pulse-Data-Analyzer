@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, TeleradiologyCase } from "@/context/DataContext";
 import { ActionModal, NoticeModal } from "@/components/ActionModal";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 type CaseStatus = TeleradiologyCase["status"];
 const STATUS_META: Record<CaseStatus, { color: string; icon: any; label: string }> = {
@@ -24,7 +25,7 @@ export default function TeleradiologyScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { teleradiologyCases, updateCaseStatus } = useData();
+  const { teleradiologyCases, updateCaseStatus, connectionErrors, refresh } = useData();
   const [filter, setFilter] = useState<CaseStatus | "all">("all");
   const [actionTarget, setActionTarget] = useState<TeleradiologyCase | null>(null);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
@@ -95,7 +96,21 @@ export default function TeleradiologyScreen() {
         renderItem={({ item }) => <CaseCard tc={item} colors={colors} onAction={() => handleAction(item)} />}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<View style={styles.empty}><Feather name="radio" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No cases found</Text></View>}
+        ListEmptyComponent={
+          connectionErrors.teleradiology ? (
+            <ConnectionWarning
+              message={connectionErrors.teleradiology}
+              onRetry={refresh}
+              testID="teleradiology-connection-warning"
+              retryTestID="teleradiology-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="radio" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No cases found</Text>
+            </View>
+          )
+        }
       />
       <ActionModal
         visible={!!actionTarget}

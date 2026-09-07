@@ -153,6 +153,20 @@ export interface PlatformSettings {
   inactivityTimeoutMinutes: number;
 }
 
+export type DataResource =
+  | "providers"
+  | "appointments"
+  | "revenue"
+  | "institutes"
+  | "banners"
+  | "reviews"
+  | "patients"
+  | "audit"
+  | "teleradiology"
+  | "settings";
+
+export type DataResourceErrors = Record<DataResource, string | null>;
+
 // ─── API fetch ────────────────────────────────────────────────────────────────
 
 function getApiBase(): string {
@@ -214,6 +228,7 @@ interface DataContextValue {
   settings: PlatformSettings;
   isLoading: boolean;
   connectionError: string | null;
+  connectionErrors: DataResourceErrors;
 
   // Providers
   updateDoctorStatus: (id: string, status: DoctorStatus) => Promise<void>;
@@ -277,6 +292,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<PlatformSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionErrors, setConnectionErrors] = useState<DataResourceErrors>({
+    providers: null,
+    appointments: null,
+    revenue: null,
+    institutes: null,
+    banners: null,
+    reviews: null,
+    patients: null,
+    audit: null,
+    teleradiology: null,
+    settings: null,
+  });
 
   const refresh = useCallback(async () => {
     const [
@@ -299,9 +326,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
       doctorsResult, appointmentsResult, revenueResult, institutesResult,
       bannersResult, reviewsResult, patientsResult, auditResult, teleResult, settingsResult,
     ];
+    const errorMessage = "We couldn't load live data. Check your connection and try again.";
+    const nextConnectionErrors: DataResourceErrors = {
+      providers: doctorsResult.error ? errorMessage : null,
+      appointments: appointmentsResult.error ? errorMessage : null,
+      revenue: revenueResult.error ? errorMessage : null,
+      institutes: institutesResult.error ? errorMessage : null,
+      banners: bannersResult.error ? errorMessage : null,
+      reviews: reviewsResult.error ? errorMessage : null,
+      patients: patientsResult.error ? errorMessage : null,
+      audit: auditResult.error ? errorMessage : null,
+      teleradiology: teleResult.error ? errorMessage : null,
+      settings: settingsResult.error ? errorMessage : null,
+    };
+    setConnectionErrors(nextConnectionErrors);
     setConnectionError(
       results.some((result) => result.error)
-        ? "We couldn't load live data. Check your connection and try again."
+        ? errorMessage
         : null,
     );
 
@@ -439,6 +480,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider value={{
       doctors, appointments, revenue, institutes, banners, reviews,
       patients, auditLogs, teleradiologyCases, settings, isLoading, connectionError,
+      connectionErrors,
       updateDoctorStatus, verifyDoctorLicense, getDoctorLicenseUrl,
       addInstitute, updateInstituteStatus,
       addBanner, toggleBanner, deleteBanner, uploadBannerImage,

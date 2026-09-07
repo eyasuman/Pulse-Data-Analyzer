@@ -9,6 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, Institute, InstituteStatus, InstituteType } from "@/context/DataContext";
 import { ActionModal, NoticeModal } from "@/components/ActionModal";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 const TYPE_ICONS: Record<InstituteType, any> = {
   Hospital: "activity", Clinic: "user", "Diagnostic Center": "search",
@@ -25,7 +26,7 @@ export default function InstitutesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { institutes, addInstitute, updateInstituteStatus } = useData();
+  const { institutes, addInstitute, updateInstituteStatus, connectionErrors, refresh } = useData();
   const [activeFilter, setActiveFilter] = useState<InstituteStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -125,7 +126,21 @@ export default function InstitutesScreen() {
         )}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 30) }]}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<View style={styles.empty}><Feather name="grid" size={32} color={colors.mutedForeground} /><Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No institutes found</Text></View>}
+        ListEmptyComponent={
+          connectionErrors.institutes ? (
+            <ConnectionWarning
+              message={connectionErrors.institutes}
+              onRetry={refresh}
+              testID="institutes-connection-warning"
+              retryTestID="institutes-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="grid" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No institutes found</Text>
+            </View>
+          )
+        }
       />
 
       <ActionModal

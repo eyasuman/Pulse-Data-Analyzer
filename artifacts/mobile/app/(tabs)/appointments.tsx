@@ -7,6 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, AppointmentStatus } from "@/context/DataContext";
 import { AppointmentCard } from "@/components/AppointmentCard";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 const STATUS_FILTERS: Array<AppointmentStatus | "all"> = ["all", "pending", "scheduled", "completed", "cancelled"];
 
@@ -27,7 +28,7 @@ const summaryStyles = StyleSheet.create({
 export default function AppointmentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { appointments } = useData();
+  const { appointments, connectionErrors, refresh } = useData();
   const [activeFilter, setActiveFilter] = useState<AppointmentStatus | "all">("all");
 
   const filtered = useMemo(() => {
@@ -89,10 +90,19 @@ export default function AppointmentsScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 90) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="calendar" size={32} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No appointments found</Text>
-          </View>
+          connectionErrors.appointments ? (
+            <ConnectionWarning
+              message={connectionErrors.appointments}
+              onRetry={refresh}
+              testID="appointments-connection-warning"
+              retryTestID="appointments-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="calendar" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No appointments found</Text>
+            </View>
+          )
         }
       />
     </View>

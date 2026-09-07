@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useData, AuditLog } from "@/context/DataContext";
+import { ConnectionWarning } from "@/components/ConnectionWarning";
 
 type LogType = "User" | "Admin" | "System";
 const TYPE_META: Record<LogType, { color: string; icon: any }> = {
@@ -19,7 +20,7 @@ export default function AuditScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { auditLogs } = useData();
+  const { auditLogs, connectionErrors, refresh } = useData();
   const [filter, setFilter] = useState<LogType | "all">("all");
 
   const filtered = useMemo(() => {
@@ -88,10 +89,19 @@ export default function AuditScreen() {
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 24 : 30) }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="list" size={32} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No audit logs</Text>
-          </View>
+          connectionErrors.audit ? (
+            <ConnectionWarning
+              message={connectionErrors.audit}
+              onRetry={refresh}
+              testID="audit-connection-warning"
+              retryTestID="audit-retry"
+            />
+          ) : (
+            <View style={styles.empty}>
+              <Feather name="list" size={32} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No audit logs</Text>
+            </View>
+          )
         }
       />
     </View>
