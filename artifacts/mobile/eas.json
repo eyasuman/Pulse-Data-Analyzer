@@ -14,6 +14,9 @@
     "preview": {
       "distribution": "internal",
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api",
         "EXPO_PUBLIC_SUPABASE_URL": "https://qxdqubzymuqgppwlzbsc.supabase.co"
@@ -21,6 +24,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://pulse-data-analyzer.replit.app/api",
         "EXPO_PUBLIC_SUPABASE_URL": "https://qxdqubzymuqgppwlzbsc.supabase.co"
