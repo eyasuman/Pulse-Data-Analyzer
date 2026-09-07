@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, FlatList, Pressable, Platform,
-  Linking, ActivityIndicator,
+  Linking, ActivityIndicator, Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -33,17 +33,25 @@ export default function LicenseReviewScreen() {
     setViewingId(doctor.id);
     try {
       const { signedUrl, fileName } = await getDoctorLicenseUrl(doctor.id);
-      // Open in browser — signed URL, valid 10 min, never a public URL
-      const canOpen = await Linking.canOpenURL(signedUrl);
-      if (canOpen) {
-        await Linking.openURL(signedUrl);
-      } else {
-        setNotice({ title: "Cannot Open", message: `Copy this URL to view:\n${signedUrl}` });
-      }
+      await openLicenseUrl(signedUrl);
     } catch (err: any) {
       setNotice({ title: "Error", message: err?.message ?? "Could not fetch license URL." });
     } finally {
       setViewingId(null);
+    }
+  };
+
+  const openLicenseUrl = async (signedUrl: string) => {
+    try {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.open(signedUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      const canOpen = await Linking.canOpenURL(signedUrl);
+      if (!canOpen) throw new Error("This file cannot be opened on this device.");
+      await Linking.openURL(signedUrl);
+    } catch (err: any) {
+      setNotice({ title: "Cannot Open", message: err?.message ?? `Copy this URL to view:\n${signedUrl}` });
     }
   };
 
@@ -107,6 +115,8 @@ export default function LicenseReviewScreen() {
             isLoading={loadingId === item.id}
             isViewing={viewingId === item.id}
             onView={() => handleViewLicense(item)}
+            getLicenseUrl={getDoctorLicenseUrl}
+            onOpenUrl={openLicenseUrl}
             onApprove={() => handleVerify(item, true)}
             onReject={() => handleVerify(item, false)}
           />
@@ -147,18 +157,57 @@ export default function LicenseReviewScreen() {
 }
 
 function LicenseCard({
-  doctor, colors, isLoading, isViewing, onView, onApprove, onReject,
+  doctor, colors, isLoading, isViewing, onView, getLicenseUrl, onOpenUrl, onApprove, onReject,
 }: {
   doctor: Doctor;
   colors: any;
   isLoading: boolean;
   isViewing: boolean;
   onView: () => void;
+  getLicenseUrl: (id: string) => Promise<{ signedUrl: string; fileName: string }>;
+  onOpenUrl: (url: string) => Promise<void>;
   onApprove: () => void;
   onReject: () => void;
 }) {
   const initials = doctor.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const lf = doctor.licenseFile;
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState(lf?.name ?? "license");
+  const [previewLoading, setPreviewLoading] = useState(!!lf);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const fetchKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!lf) return;
+    const fetchKey = `${doctor.id}:${lf.path}:${lf.name}`;
+    if (fetchKeyRef.current === fetchKey) return;
+    fetchKeyRef.current = fetchKey;
+    let active = true;
+    setPreviewLoading(true);
+    setPreviewFailed(false);
+    getLicenseUrl(doctor.id)
+      .then(({ signedUrl, fileName }) => {
+        if (!active) return;
+        setPreviewUrl(signedUrl);
+        setPreviewFileName(fileName || lf.name || "license");
+      })
+      .catch(() => {
+        if (active) setPreviewFailed(true);
+      })
+      .finally(() => {
+        if (active) setPreviewLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [doctor.id, lf?.path, lf?.name]);
+
+  const fileType = (lf?.type ?? "").toLowerCase();
+  const fileName = previewFileName || lf?.name || "license";
+  const isPdf = fileType === "application/pdf" || /\.pdf$/i.test(fileName);
+  const isImage = fileType.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+  const supportsInlinePreview = !!previewUrl && !previewFailed && (isImage || (isPdf && Platform.OS === "web"));
+  const fileSize = formatFileSize(lf?.size);
 
   return (
     <View style={[cardStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -179,31 +228,81 @@ function LicenseCard({
         </View>
       </View>
 
-      {/* License file info */}
+      {/* License file header and inline private preview */}
       {lf && (
-        <View style={[cardStyles.fileRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Feather name="file-text" size={14} color={colors.mutedForeground} />
-          <View style={{ flex: 1 }}>
-            <Text style={[cardStyles.fileName, { color: colors.foreground }]}>{lf.name}</Text>
-            <Text style={[cardStyles.fileType, { color: colors.mutedForeground }]}>{lf.type} · Private bucket</Text>
-          </View>
-          <Pressable
-            onPress={onView}
-            disabled={isViewing}
-            style={({ pressed }) => [
-              cardStyles.viewBtn,
-              { backgroundColor: "#818cf815", borderColor: "#818cf830", opacity: pressed || isViewing ? 0.7 : 1 },
-            ]}
-          >
-            {isViewing ? (
-              <ActivityIndicator size={12} color="#818cf8" />
-            ) : (
-              <>
+        <View style={cardStyles.previewSection}>
+          <View style={[cardStyles.fileHeader, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Feather name={isPdf ? "file-text" : isImage ? "image" : "file"} size={14} color={colors.mutedForeground} />
+            <View style={cardStyles.fileMeta}>
+              <Text numberOfLines={2} style={[cardStyles.fileName, { color: colors.foreground }]}>{fileName}</Text>
+              <Text style={[cardStyles.fileType, { color: colors.mutedForeground }]}>
+                {lf.type || "Unknown file"}{fileSize ? ` · ${fileSize}` : ""} · Private bucket
+              </Text>
+            </View>
+            {previewUrl && (
+              <Pressable
+                onPress={() => onOpenUrl(previewUrl)}
+                style={({ pressed }) => [
+                  cardStyles.openLink,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
                 <Feather name="external-link" size={11} color="#818cf8" />
-                <Text style={[cardStyles.viewText, { color: "#818cf8" }]}>View</Text>
-              </>
+                <Text style={[cardStyles.viewText, { color: "#818cf8" }]}>Open in new tab</Text>
+              </Pressable>
             )}
-          </Pressable>
+          </View>
+
+          {previewLoading ? (
+            <View style={[cardStyles.previewFallback, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <ActivityIndicator size="small" color="#818cf8" />
+              <Text style={[cardStyles.fallbackText, { color: colors.mutedForeground }]}>Preparing private preview…</Text>
+            </View>
+          ) : supportsInlinePreview && isImage ? (
+            <View style={[cardStyles.previewFrame, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Image
+                source={{ uri: previewUrl! }}
+                resizeMode="contain"
+                accessibilityLabel={`Preview of ${fileName}`}
+                style={cardStyles.imagePreview}
+                onError={() => setPreviewFailed(true)}
+              />
+            </View>
+          ) : supportsInlinePreview && isPdf && Platform.OS === "web" ? (
+            <View style={[cardStyles.previewFrame, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              {React.createElement("iframe", {
+                src: previewUrl,
+                title: `Preview of ${fileName}`,
+                style: { width: "100%", height: 400, border: 0, borderRadius: 10 },
+              })}
+            </View>
+          ) : (
+            <View style={[cardStyles.fileRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+              <Feather name="file-text" size={14} color={colors.mutedForeground} />
+              <View style={{ flex: 1 }}>
+                <Text style={[cardStyles.fallbackText, { color: colors.mutedForeground }]}>
+                  {previewFailed ? "Inline preview unavailable." : "Preview is not supported for this file type."}
+                </Text>
+              </View>
+              <Pressable
+                onPress={onView}
+                disabled={isViewing}
+                style={({ pressed }) => [
+                  cardStyles.viewBtn,
+                  { backgroundColor: "#818cf815", borderColor: "#818cf830", opacity: pressed || isViewing ? 0.7 : 1 },
+                ]}
+              >
+                {isViewing ? (
+                  <ActivityIndicator size={12} color="#818cf8" />
+                ) : (
+                  <>
+                    <Feather name="external-link" size={11} color="#818cf8" />
+                    <Text style={[cardStyles.viewText, { color: "#818cf8" }]}>View</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
@@ -274,9 +373,17 @@ const cardStyles = StyleSheet.create({
   specialty: { fontSize: 11, fontFamily: "Inter_400Regular" },
   pendingBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, alignSelf: "flex-start", marginTop: 2 },
   pendingText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.8 },
-  fileRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, borderWidth: 1, padding: 10 },
+  previewSection: { gap: 8 },
+  fileHeader: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, borderWidth: 1, padding: 10 },
+  fileMeta: { flex: 1, minWidth: 0 },
   fileName: { fontSize: 12, fontWeight: "500", fontFamily: "Inter_500Medium" },
   fileType: { fontSize: 10, marginTop: 1, fontFamily: "Inter_400Regular" },
+  openLink: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4, paddingLeft: 4 },
+  previewFrame: { width: "100%", minHeight: 180, borderRadius: 10, borderWidth: 1, overflow: "hidden", padding: 8 },
+  imagePreview: { width: "100%", height: 300, borderRadius: 8 },
+  previewFallback: { minHeight: 100, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, borderWidth: 1, padding: 12 },
+  fallbackText: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  fileRow: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, borderWidth: 1, padding: 10 },
   viewBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   viewText: { fontSize: 11, fontWeight: "600" },
   detailRow: { flexDirection: "row", gap: 16, flexWrap: "wrap" },

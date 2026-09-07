@@ -10,6 +10,7 @@ export interface LicenseFile {
   path: string;
   name: string;
   type: string;
+  size?: number;
 }
 
 export interface Doctor {
