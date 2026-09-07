@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "pnpm": "10.26.1",
       "developmentClient": true,
       "distribution": "internal",
       "env": {
@@ -12,6 +13,7 @@
       }
     },
     "preview": {
+      "pnpm": "10.26.1",
       "distribution": "internal",
       "autoIncrement": true,
       "android": {
@@ -23,6 +25,7 @@
       }
     },
     "production": {
+      "pnpm": "10.26.1",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
