@@ -200,6 +200,13 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   return res.json();
 }
 
+export function normalizeSignedStorageUrl(signedUrl: string): string {
+  return signedUrl.replace(
+    /^(https?:\/\/[^/]+)\/object\/sign\//,
+    "$1/storage/v1/object/sign/",
+  );
+}
+
 interface SafeApiResult<T> {
   data: T;
   error: unknown | null;
@@ -386,12 +393,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getDoctorLicenseUrl = async (id: string) => {
-    return apiFetch<{
+    const result = await apiFetch<{
       signedUrl: string;
       fileName: string;
       mimeType?: string;
       size?: number;
     }>(`/providers/${id}/license-url`);
+    return {
+      ...result,
+      signedUrl: normalizeSignedStorageUrl(result.signedUrl),
+    };
   };
 
   // ── Institutes ─────────────────────────────────────────────────────────────

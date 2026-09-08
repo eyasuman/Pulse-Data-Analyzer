@@ -46,13 +46,14 @@ function GatewayLock({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const backgroundedAtRef = useRef<number | null>(null);
   const timeoutMs = (settings.inactivityTimeoutMinutes ?? 5) * 60 * 1000;
 
   const lock = useCallback(() => { setUnlocked(false); }, []);
 
-  const resetTimer = useCallback(() => {
+  const resetTimer = useCallback((delayMs = timeoutMs) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(lock, timeoutMs);
+    timeoutRef.current = setTimeout(lock, delayMs);
   }, [lock, timeoutMs]);
 
   const handleUnlock = useCallback(() => {
@@ -70,11 +71,22 @@ function GatewayLock({ children }: { children: React.ReactNode }) {
       appStateRef.current = nextState;
       if (prev === "active" && nextState.match(/inactive|background/)) {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        lock();
+        backgroundedAtRef.current = Date.now();
+        return;
+      }
+      if (nextState === "active" && prev !== "active" && unlocked) {
+        const backgroundedAt = backgroundedAtRef.current;
+        backgroundedAtRef.current = null;
+        const elapsed = backgroundedAt ? Date.now() - backgroundedAt : 0;
+        if (elapsed >= timeoutMs) {
+          lock();
+        } else {
+          resetTimer(Math.max(1, timeoutMs - elapsed));
+        }
       }
     });
     return () => sub.remove();
-  }, [lock]);
+  }, [lock, resetTimer, timeoutMs, unlocked]);
 
   useEffect(() => {
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
