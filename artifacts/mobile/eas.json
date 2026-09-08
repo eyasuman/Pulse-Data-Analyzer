@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "node": "20.19.4",
       "pnpm": "10.26.1",
       "developmentClient": true,
       "distribution": "internal",
@@ -13,6 +14,7 @@
       }
     },
     "preview": {
+      "node": "20.19.4",
       "pnpm": "10.26.1",
       "distribution": "internal",
       "autoIncrement": true,
@@ -25,6 +27,7 @@
       }
     },
     "production": {
+      "node": "20.19.4",
       "pnpm": "10.26.1",
       "autoIncrement": true,
       "android": {
