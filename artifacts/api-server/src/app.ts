@@ -26,7 +26,9 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
+// Banner images are sent as base64 JSON. A 5 MB decoded image expands to
+// roughly 6.7 MB in transit, so leave enough room for the encoded payload.
+app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
