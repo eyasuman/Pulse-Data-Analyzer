@@ -152,6 +152,10 @@ export interface PlatformSettings {
   reminderCadence: "weekly" | "daily" | "same-day";
   gatewayPassword: string;
   inactivityTimeoutMinutes: number;
+  globalTelebirrNumber: string;
+  globalTelebirrName: string;
+  globalCbeNumber: string;
+  globalCbeName: string;
 }
 
 export type DataResource =
@@ -288,6 +292,10 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   reminderCadence: "daily",
   gatewayPassword: "0000",
   inactivityTimeoutMinutes: 5,
+  globalTelebirrNumber: "",
+  globalTelebirrName: "",
+  globalCbeNumber: "",
+  globalCbeName: "",
 };
 
 const DataContext = createContext<DataContextValue | null>(null);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, Switch,
 } from "react-native";
@@ -37,6 +37,10 @@ export default function SettingsScreen() {
   const [penalty, setPenalty] = useState(String(settings.cancellationPenaltyFee));
   const [cadence, setCadence] = useState(settings.reminderCadence);
   const [timeoutMinutes, setTimeoutMinutes] = useState(settings.inactivityTimeoutMinutes ?? 5);
+  const [telebirrNumber, setTelebirrNumber] = useState(settings.globalTelebirrNumber);
+  const [telebirrName, setTelebirrName] = useState(settings.globalTelebirrName);
+  const [cbeNumber, setCbeNumber] = useState(settings.globalCbeNumber);
+  const [cbeName, setCbeName] = useState(settings.globalCbeName);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [newRegEnabled, setNewRegEnabled] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(true);
@@ -51,6 +55,18 @@ export default function SettingsScreen() {
 
   const topPt = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
 
+  useEffect(() => {
+    setTelebirrNumber(settings.globalTelebirrNumber);
+    setTelebirrName(settings.globalTelebirrName);
+    setCbeNumber(settings.globalCbeNumber);
+    setCbeName(settings.globalCbeName);
+  }, [
+    settings.globalTelebirrNumber,
+    settings.globalTelebirrName,
+    settings.globalCbeNumber,
+    settings.globalCbeName,
+  ]);
+
   const handleSave = async () => {
     const feeNum = parseFloat(fee);
     const noticeNum = parseInt(noticePeriod);
@@ -59,6 +75,8 @@ export default function SettingsScreen() {
     if (isNaN(noticeNum) || noticeNum < 0) { setNotice({ title: "Invalid Notice Period", message: "Cancellation notice must be zero or more hours." }); return; }
     if (isNaN(penaltyNum) || penaltyNum < 0) { setNotice({ title: "Invalid Penalty", message: "Cancellation penalty must be zero or more." }); return; }
     if (!Number.isInteger(timeoutMinutes) || timeoutMinutes < 1) { setNotice({ title: "Invalid Timeout", message: "Inactivity timeout must be at least one minute." }); return; }
+    if (!!telebirrNumber.trim() !== !!telebirrName.trim()) { setNotice({ title: "Incomplete Telebirr Details", message: "Enter both the Telebirr account number and account name, or leave both blank." }); return; }
+    if (!!cbeNumber.trim() !== !!cbeName.trim()) { setNotice({ title: "Incomplete CBE Details", message: "Enter both the CBE account number and account name, or leave both blank." }); return; }
     setSaving(true);
     try {
       await updateSettings({
@@ -68,6 +86,10 @@ export default function SettingsScreen() {
         reminderCadence: cadence,
         gatewayPassword: settings.gatewayPassword,
         inactivityTimeoutMinutes: timeoutMinutes,
+        globalTelebirrNumber: telebirrNumber.trim(),
+        globalTelebirrName: telebirrName.trim(),
+        globalCbeNumber: cbeNumber.trim(),
+        globalCbeName: cbeName.trim(),
       });
       setNotice({ title: "Saved", message: "Platform settings updated successfully." });
     } catch (error: any) { setNotice({ title: "Error", message: error?.message ?? "Failed to save settings." }); }
@@ -112,6 +134,32 @@ export default function SettingsScreen() {
         <FieldRow label="Platform Fee %" desc="Percentage taken from each transaction" value={fee} onChangeText={setFee} unit="%" colors={colors} />
         <FieldRow label="Cancellation Notice" desc="Hours required before cancelling" value={noticePeriod} onChangeText={setNoticePeriod} unit="hrs" colors={colors} />
         <FieldRow label="Cancellation Penalty" desc="Fee charged for late cancellations" value={penalty} onChangeText={setPenalty} unit="AED" colors={colors} />
+      </SettingSection>
+
+      <SettingSection title="Payment Methods" icon="credit-card" colors={colors}>
+        <View style={[styles.paymentMethodHeader, { borderBottomColor: colors.border }]}>
+          <View style={[styles.paymentMethodIcon, { backgroundColor: colors.primary + "18" }]}>
+            <Feather name="smartphone" size={16} color={colors.primary} />
+          </View>
+          <View style={styles.fieldInfo}>
+            <Text style={[styles.paymentMethodTitle, { color: colors.foreground }]}>Telebirr</Text>
+            <Text style={[styles.fieldDesc, { color: colors.mutedForeground }]}>Platform fallback account shown at patient checkout</Text>
+          </View>
+        </View>
+        <PaymentField label="Account or merchant number" value={telebirrNumber} onChangeText={setTelebirrNumber} placeholder="Enter Telebirr number" colors={colors} />
+        <PaymentField label="Account or merchant name" value={telebirrName} onChangeText={setTelebirrName} placeholder="Enter account name" colors={colors} />
+
+        <View style={[styles.paymentMethodHeader, styles.paymentMethodDivider, { borderColor: colors.border }]}>
+          <View style={[styles.paymentMethodIcon, { backgroundColor: colors.primary + "18" }]}>
+            <Feather name="briefcase" size={16} color={colors.primary} />
+          </View>
+          <View style={styles.fieldInfo}>
+            <Text style={[styles.paymentMethodTitle, { color: colors.foreground }]}>CBE Bank Transfer</Text>
+            <Text style={[styles.fieldDesc, { color: colors.mutedForeground }]}>Platform fallback bank account shown at patient checkout</Text>
+          </View>
+        </View>
+        <PaymentField label="Account number" value={cbeNumber} onChangeText={setCbeNumber} placeholder="Enter CBE account number" colors={colors} />
+        <PaymentField label="Account name" value={cbeName} onChangeText={setCbeName} placeholder="Enter account name" colors={colors} />
       </SettingSection>
 
       {/* Reminder Cadence */}
@@ -173,6 +221,8 @@ export default function SettingsScreen() {
         <InfoRow label="Cancellation Notice" value={`${settings.cancellationNoticePeriodHours}h`} colors={colors} />
         <InfoRow label="Reminder Cadence" value={settings.reminderCadence} colors={colors} />
         <InfoRow label="Inactivity Timeout" value={`${settings.inactivityTimeoutMinutes} min`} colors={colors} />
+        <InfoRow label="Telebirr" value={settings.globalTelebirrNumber ? "Configured" : "Not configured"} colors={colors} />
+        <InfoRow label="CBE Bank Transfer" value={settings.globalCbeNumber ? "Configured" : "Not configured"} colors={colors} />
       </View>
       <NoticeModal
         visible={!!notice}
@@ -207,6 +257,23 @@ function ToggleRow({ label, desc, value, onToggle, danger, colors }: any) {
         <Text style={[styles.fieldDesc, { color: colors.mutedForeground }]}>{desc}</Text>
       </View>
       <Switch value={value} onValueChange={onToggle} trackColor={{ false: colors.border, true: danger ? "#ef444488" : colors.primary + "88" }} thumbColor={value ? (danger ? "#ef4444" : colors.primary) : colors.mutedForeground} ios_backgroundColor={colors.border} />
+    </View>
+  );
+}
+
+function PaymentField({ label, value, onChangeText, placeholder, colors }: any) {
+  return (
+    <View style={[styles.paymentField, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.pwFieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <TextInput
+        style={[styles.paymentInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.foreground }]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        autoCapitalize="words"
+        maxLength={100}
+      />
     </View>
   );
 }
@@ -251,6 +318,12 @@ const styles = StyleSheet.create({
   inputBox: { flexDirection: "row", alignItems: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, minWidth: 80 },
   input: { fontSize: 15, fontWeight: "700", fontFamily: "Inter_700Bold", flex: 1, padding: 0, textAlign: "right" },
   inputUnit: { fontSize: 11, marginLeft: 4 },
+  paymentMethodHeader: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderBottomWidth: 1 },
+  paymentMethodDivider: { borderTopWidth: 1, marginTop: 4 },
+  paymentMethodIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  paymentMethodTitle: { fontSize: 13, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  paymentField: { gap: 6, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth },
+  paymentInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
   cadenceRow: { flexDirection: "row", gap: 8, padding: 14, paddingTop: 8 },
   cadenceChip: { paddingVertical: 8, borderRadius: 10, borderWidth: 1, alignItems: "center" },
   cadenceText: { fontSize: 11, fontWeight: "600" },
