@@ -32,6 +32,23 @@ router.get("/settings", async (req, res) => {
   }
 });
 
+router.get("/settings/payment-methods", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const rows = await sbSelect("settings", "?limit=1");
+    const settings = rows.length ? normalizeSettings(rows[0]) : DEFAULT_SETTINGS;
+    res.json({
+      global_telebirr_number: settings.globalTelebirrNumber,
+      global_telebirr_name: settings.globalTelebirrName,
+      global_cbe_number: settings.globalCbeNumber,
+      global_cbe_name: settings.globalCbeName,
+    });
+  } catch (err) {
+    req.log.error({ err }, "GET /settings/payment-methods failed");
+    res.status(503).json({ error: "Payment methods are temporarily unavailable" });
+  }
+});
+
 router.put("/settings", async (req, res) => {
   const paymentSettings = validatePaymentSettings(req.body);
   if ("error" in paymentSettings) {
